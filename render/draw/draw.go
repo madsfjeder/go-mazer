@@ -3,6 +3,7 @@ package render
 
 import (
 	"flag"
+	"fmt"
 	"image/color"
 	"strconv"
 	"time"
@@ -37,13 +38,13 @@ func (r RaylibRenderer) Config() grid.Config {
 	return r.config
 }
 
-func NewRaylibRenderer(x, y int, colors grid.Colors) RaylibRenderer {
+func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors) RaylibRenderer {
 	return RaylibRenderer{
 		config: grid.Config{
-			X:      int32(x),
-			Y:      int32(y),
-			Width:  config.Width,
-			Height: config.Height,
+			X:         int32(x),
+			Y:         int32(y),
+			EdgeWidth: config.EdgeWidth,
+			CellType:  cellType,
 		},
 		colors: colors,
 	}
@@ -58,9 +59,10 @@ func Draw(maze generate.Maze) {
 	}
 
 	colors := grid.Colors{
-		Wall:      rl.Black,
+		Wall:      rl.White,
 		Cell:      rl.White,
 		Text:      rl.Red,
+		CPU:       rl.Blue,
 		DebugWall: rl.Beige,
 	}
 
@@ -73,7 +75,7 @@ func Draw(maze generate.Maze) {
 	reversedSteps.Reverse()
 
 	var timeAcc int64 = 0
-	var interval int64 = int64(*intervalPtr)
+	interval := int64(*intervalPtr)
 	prevTime := time.Now()
 	matrixToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
 
@@ -86,7 +88,7 @@ func Draw(maze generate.Maze) {
 	rl.DrawRectangle(0, 0, config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, rl.Black)
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
-		delta := time.Now().Sub(prevTime)
+		delta := time.Since(prevTime)
 		timeAcc += delta.Milliseconds()
 		if timeAcc >= interval {
 			timeAcc -= interval
@@ -111,13 +113,14 @@ func Draw(maze generate.Maze) {
 			for j := range matrixToDraw[i] {
 				e := matrixToDraw[i][j]
 				if e != nil {
-					r := NewRaylibRenderer(i, j, colors)
+					fmt.Println("Drawing ", i, j, colors.Wall)
+					r := NewRaylibRenderer(i, j, grid.Path, colors)
 					e.DrawVertex(r)
 					if DEBUG {
 						backTracked := maze.BacktrackSteps.FindOrder(e)
 						if backTracked != -1 {
 							e.DrawVertex(r)
-							e.DrawText(i, j, strconv.Itoa(backTracked))
+							e.DrawText(r, strconv.Itoa(backTracked), 13)
 						}
 					}
 				}
@@ -125,7 +128,8 @@ func Draw(maze generate.Maze) {
 		}
 
 		if elementToDraw != nil {
-			elementToDraw.DrawVertex(x, y, rl.Blue)
+			r := NewRaylibRenderer(x, y, grid.CPU, colors)
+			elementToDraw.DrawVertex(r)
 		}
 
 		prevTime = time.Now()

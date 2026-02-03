@@ -161,16 +161,25 @@ func (v *Vertex) Copy() Vertex {
 type Colors struct {
 	Wall      color.RGBA
 	Cell      color.RGBA
+	CPU       color.RGBA
 	Text      color.RGBA
 	DebugWall color.RGBA
 }
 
+type CellType int
+
+const (
+	Wall CellType = iota
+	Path
+	CPU
+)
+
 type Config struct {
-	Width  int32
-	Height int32
-	X      int32
-	Y      int32
-	Debug  bool
+	EdgeWidth int32
+	X         int32
+	Y         int32
+	Debug     bool
+	CellType  CellType
 }
 
 type Renderer interface {
@@ -181,44 +190,48 @@ type Renderer interface {
 }
 
 func (v Vertex) DrawVertex(r Renderer) {
-	width := r.Config().Width
-	height := r.Config().Height
-	xPos := (r.Config().X * height * 2) + width
-	yPos := (r.Config().Y * width * 2) + width
+	cellType := r.Config().CellType
+	edgeWidth := r.Config().EdgeWidth
+	xPos := (r.Config().X * edgeWidth * 2) + edgeWidth
+	yPos := (r.Config().Y * edgeWidth * 2) + edgeWidth
 
-	wallColor := r.Colors().Wall
+	cellColor := r.Colors().Wall
 
-	if r.Config().Debug {
-		wallColor = r.Colors().DebugWall
+	switch cellType {
+	case Wall:
+		break
+
+	case Path:
+		cellColor = r.Colors().Cell
+
+	case CPU:
+		cellColor = r.Colors().CPU
 	}
 
-	cellColor := r.Colors().Cell
-
 	if v.Visited {
-		r.DrawRectangle(xPos, yPos, width, height, cellColor)
+		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 	}
 
 	if v.hasConnectedVertex("top") && !v.TopEdge.IsWall {
-		r.DrawRectangle(xPos, yPos-width, width, height, wallColor)
+		r.DrawRectangle(xPos, yPos-edgeWidth, edgeWidth, edgeWidth, cellColor)
 	}
 
 	if v.hasConnectedVertex("right") && !v.RightEdge.IsWall {
-		r.DrawRectangle(xPos+width, yPos, width, height, wallColor)
+		r.DrawRectangle(xPos+edgeWidth, yPos, edgeWidth, edgeWidth, cellColor)
 	}
 
 	if v.hasConnectedVertex("bottom") && !v.BottomEdge.IsWall {
-		r.DrawRectangle(xPos, yPos+width, width, height, wallColor)
+		r.DrawRectangle(xPos, yPos+edgeWidth, edgeWidth, edgeWidth, cellColor)
 	}
 
 	if v.hasConnectedVertex("left") && !v.LeftEdge.IsWall {
-		r.DrawRectangle(xPos-width, yPos, width, height, wallColor)
+		r.DrawRectangle(xPos-edgeWidth, yPos, edgeWidth, edgeWidth, cellColor)
 	}
 }
 
-func (v *Vertex) DrawText(r Renderer, s string, fontSize int) {
-	width := r.Config().width
-	height := r.Config().height
-	xPos := (r.Config().x * width * 2) + width
-	yPos := (r.Config().y * width * 2) + height
+func (v *Vertex) DrawText(r Renderer, s string, fontSize int32) {
+	edgeWidth := r.Config().EdgeWidth
+	xPos := (r.Config().X * edgeWidth * 2) + edgeWidth
+	yPos := (r.Config().Y * edgeWidth * 2) + edgeWidth
 	r.DrawText(s, xPos, yPos, fontSize, r.Colors().Text)
 }

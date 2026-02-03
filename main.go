@@ -13,7 +13,7 @@ func main() {
 
 	maze, err := generate.Generate()
 	if err != nil {
-		panic("err")
+		panic(err)
 	}
 
 	render.Draw(maze)

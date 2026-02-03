@@ -115,7 +115,6 @@ func Generate() (Maze, error) {
 		if nextVertex == nil || err != nil {
 			currentVertex, err = history.Pop()
 			if err != nil || currentVertex == nil {
-				mazeIncomplete = true
 				break
 			}
 			allSteps.Push(currentVertex)
