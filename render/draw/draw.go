@@ -30,6 +30,10 @@ func (r RaylibRenderer) DrawText(text string, x, y, fontSize int32, color color.
 	rl.DrawText(text, x, y, fontSize, color)
 }
 
+func (r RaylibRenderer) DrawCircle(x, y int32, radius float32, color color.RGBA) {
+	rl.DrawCircle(x, y, radius, color)
+}
+
 func (r RaylibRenderer) Colors() grid.Colors {
 	return r.colors
 }
@@ -53,12 +57,16 @@ func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors) Ray
 func Draw(maze generate.Maze) {
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	intervalPtr := flag.Int("interval", 5, "set the rendering interval")
+	flag.Parse()
 
+	fmt.Println(intervalPtr)
 	if *debugPtr {
 		DEBUG = true
 	}
 
 	colors := grid.Colors{
+		Start:     rl.DarkPurple,
+		End:       rl.Green,
 		Wall:      rl.White,
 		Cell:      rl.White,
 		Text:      rl.Red,
@@ -113,7 +121,6 @@ func Draw(maze generate.Maze) {
 			for j := range matrixToDraw[i] {
 				e := matrixToDraw[i][j]
 				if e != nil {
-					fmt.Println("Drawing ", i, j, colors.Wall)
 					r := NewRaylibRenderer(i, j, grid.Path, colors)
 					e.DrawVertex(r)
 					if DEBUG {

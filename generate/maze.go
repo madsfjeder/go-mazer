@@ -15,6 +15,19 @@ type Maze struct {
 	BacktrackSteps stack.Stack[*grid.Vertex]
 }
 
+func getDistanceFromStart(currentVertex *grid.Vertex, matrix [][]*grid.Vertex) int {
+	for i := range matrix {
+		for j := range matrix[i] {
+			elem := matrix[i][j]
+			if elem == currentVertex {
+				return i + j
+			}
+		}
+	}
+
+	return 0
+}
+
 func Generate() (Maze, error) {
 	matrix := make([][]*grid.Vertex, config.VerticesPerRow)
 
@@ -106,7 +119,13 @@ func Generate() (Maze, error) {
 	history := stack.New[*grid.Vertex]()
 	allSteps := stack.New[*grid.Vertex]()
 	backtracking := stack.New[*grid.Vertex]()
+
 	currentVertex := matrix[0][0]
+	currentVertex.IsStart = true
+
+	cartesianDistanceFromStart := 0
+	endGoalPlaced := false
+
 	mazeIncomplete := false
 
 	for i := 0; i < 10000; i++ {
@@ -120,6 +139,13 @@ func Generate() (Maze, error) {
 			allSteps.Push(currentVertex)
 			backtracking.Push(currentVertex)
 			continue
+		}
+
+		cartesianDistanceFromStart = getDistanceFromStart(currentVertex, matrix)
+
+		if !endGoalPlaced && int32(cartesianDistanceFromStart) > (config.VerticesPerCol+config.VerticesPerRow-5) {
+			currentVertex.IsEnd = true
+			endGoalPlaced = true
 		}
 
 		history.Push(currentVertex)

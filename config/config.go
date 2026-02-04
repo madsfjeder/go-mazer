@@ -4,7 +4,7 @@ package config
 const (
 	Width     int32 = 800
 	Height    int32 = 800
-	EdgeWidth int32 = 20
+	EdgeWidth int32 = 10
 )
 
 const (

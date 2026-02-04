@@ -2,15 +2,11 @@
 package main
 
 import (
-	"flag"
-
 	"maze/generate"
 	render "maze/render/draw"
 )
 
 func main() {
-	flag.Parse()
-
 	maze, err := generate.Generate()
 	if err != nil {
 		panic(err)

@@ -15,6 +15,8 @@ type Edge struct {
 
 type Vertex struct {
 	Visited    bool
+	IsStart    bool
+	IsEnd      bool
 	TopEdge    *Edge
 	RightEdge  *Edge
 	BottomEdge *Edge
@@ -159,6 +161,8 @@ func (v *Vertex) Copy() Vertex {
 }
 
 type Colors struct {
+	Start     color.RGBA
+	End       color.RGBA
 	Wall      color.RGBA
 	Cell      color.RGBA
 	CPU       color.RGBA
@@ -185,6 +189,7 @@ type Config struct {
 type Renderer interface {
 	DrawRectangle(xPos, yPos, width, height int32, color color.RGBA)
 	DrawText(text string, xPos, yPos, fontSize int32, color color.RGBA)
+	DrawCircle(x, y int32, radius float32, color color.RGBA)
 	Config() Config
 	Colors() Colors
 }
@@ -210,6 +215,14 @@ func (v Vertex) DrawVertex(r Renderer) {
 
 	if v.Visited {
 		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
+	}
+
+	if v.IsStart {
+		r.DrawCircle(xPos+(edgeWidth/2), yPos+(edgeWidth/2), float32(edgeWidth/2), r.Colors().Start)
+	}
+
+	if v.IsEnd {
+		r.DrawCircle(xPos+(edgeWidth/2), yPos+(edgeWidth/2), float32(edgeWidth/2), r.Colors().End)
 	}
 
 	if v.hasConnectedVertex("top") && !v.TopEdge.IsWall {
