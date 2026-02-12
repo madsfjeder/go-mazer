@@ -8,21 +8,25 @@ import (
 )
 
 type Edge struct {
-	IsWall  bool
-	Vertex1 *Vertex
-	Vertex2 *Vertex
+	// Consider IsPath instead to streamline
+	IsWall          bool
+	VisitedBySolver bool
+	Vertex1         *Vertex
+	Vertex2         *Vertex
 }
 
 type Vertex struct {
-	Visited    bool
-	IsStart    bool
-	IsEnd      bool
-	TopEdge    *Edge
-	RightEdge  *Edge
-	BottomEdge *Edge
-	LeftEdge   *Edge
+	IsPath          bool
+	IsStart         bool
+	IsEnd           bool
+	VisitedBySolver bool
+	TopEdge         *Edge
+	RightEdge       *Edge
+	BottomEdge      *Edge
+	LeftEdge        *Edge
 }
 
+// GetNextVertex - For generation
 func (v *Vertex) GetNextVertex() (*Vertex, error) {
 	var upVertex *Vertex
 	var rightVertex *Vertex
@@ -34,14 +38,14 @@ func (v *Vertex) GetNextVertex() (*Vertex, error) {
 	if v.TopEdge != nil {
 		upVertex = v.GetConnectedVertex(v.TopEdge)
 
-		if upVertex != nil && !upVertex.Visited {
+		if upVertex != nil && !upVertex.IsPath {
 			options = append(options, "up")
 		}
 	}
 
 	if v.RightEdge != nil {
 		rightVertex = v.GetConnectedVertex(v.RightEdge)
-		if rightVertex != nil && !rightVertex.Visited {
+		if rightVertex != nil && !rightVertex.IsPath {
 			options = append(options, "right")
 		}
 	}
@@ -49,7 +53,7 @@ func (v *Vertex) GetNextVertex() (*Vertex, error) {
 	if v.BottomEdge != nil {
 		bottomVertex = v.GetConnectedVertex(v.BottomEdge)
 
-		if bottomVertex != nil && !bottomVertex.Visited {
+		if bottomVertex != nil && !bottomVertex.IsPath {
 			options = append(options, "down")
 		}
 	}
@@ -57,7 +61,7 @@ func (v *Vertex) GetNextVertex() (*Vertex, error) {
 	if v.LeftEdge != nil {
 		leftVertex = v.GetConnectedVertex(v.LeftEdge)
 
-		if leftVertex != nil && !leftVertex.Visited {
+		if leftVertex != nil && !leftVertex.IsPath {
 			options = append(options, "left")
 		}
 	}
@@ -95,10 +99,15 @@ func (v *Vertex) GetNextVertex() (*Vertex, error) {
 }
 
 func (v *Vertex) GetConnectedVertex(e *Edge) *Vertex {
+	var zero *Vertex
 	if e == nil {
-		var zero *Vertex
 		return zero
 	}
+
+	if e.Vertex1 != v && e.Vertex2 != v {
+		return zero
+	}
+
 	otherVertex := e.Vertex1
 	if otherVertex == v {
 		otherVertex = e.Vertex2
@@ -107,26 +116,66 @@ func (v *Vertex) GetConnectedVertex(e *Edge) *Vertex {
 	return otherVertex
 }
 
-func (v *Vertex) hasConnectedVertex(dir string) bool {
+func (v *Vertex) hasConnectedVertex(dir string, shouldBePath bool) bool {
+	var connectedVertex *Vertex
+
 	switch dir {
 	case "top":
-		topVertex := v.GetConnectedVertex(v.TopEdge)
-		return topVertex != nil
+		connectedVertex = v.GetConnectedVertex(v.TopEdge)
 
 	case "right":
-		rightVertex := v.GetConnectedVertex(v.RightEdge)
-		return rightVertex != nil
+		connectedVertex = v.GetConnectedVertex(v.RightEdge)
 
 	case "bottom":
-		bottomVertex := v.GetConnectedVertex(v.BottomEdge)
-		return bottomVertex != nil
+		connectedVertex = v.GetConnectedVertex(v.BottomEdge)
 
 	case "left":
-		leftVertex := v.GetConnectedVertex(v.LeftEdge)
-		return leftVertex != nil
+		connectedVertex = v.GetConnectedVertex(v.LeftEdge)
 	}
 
-	return false
+	if shouldBePath {
+		return connectedVertex != nil && connectedVertex.IsPath
+	}
+
+	return connectedVertex != nil
+}
+
+func (v *Vertex) VisitNextVertex() *Vertex {
+	options := []string{"left", "bottom", "right", "top"}
+
+	var nextVertex *Vertex
+
+	for _, dir := range options {
+		if !v.hasConnectedVertex(dir, true) {
+			continue
+		}
+
+		var e *Edge
+
+		switch dir {
+		case "left":
+			e = v.LeftEdge
+		case "bottom":
+			e = v.BottomEdge
+		case "right":
+			e = v.RightEdge
+		case "top":
+			e = v.TopEdge
+		}
+
+		if e == nil || e.IsWall {
+			continue
+		}
+
+		t := v.GetConnectedVertex(e)
+
+		if !t.VisitedBySolver {
+			e.VisitedBySolver = true
+			nextVertex = t
+		}
+	}
+
+	return nextVertex
 }
 
 func (v *Vertex) Copy() Vertex {
@@ -152,7 +201,7 @@ func (v *Vertex) Copy() Vertex {
 	}
 
 	return Vertex{
-		Visited:    v.Visited,
+		IsPath:     v.IsPath,
 		TopEdge:    &topEdge,
 		RightEdge:  &rightEdge,
 		BottomEdge: &bottomEdge,
@@ -163,7 +212,9 @@ func (v *Vertex) Copy() Vertex {
 type Colors struct {
 	Start     color.RGBA
 	End       color.RGBA
+	Solution  color.RGBA
 	Wall      color.RGBA
+	EmptyCell color.RGBA
 	Cell      color.RGBA
 	CPU       color.RGBA
 	Text      color.RGBA
@@ -174,8 +225,10 @@ type CellType int
 
 const (
 	Wall CellType = iota
+	EmptyCell
 	Path
 	CPU
+	Solution
 )
 
 type Config struct {
@@ -194,13 +247,15 @@ type Renderer interface {
 	Colors() Colors
 }
 
-func (v Vertex) DrawVertex(r Renderer) {
+func (v *Vertex) DrawVertex(r Renderer) {
 	cellType := r.Config().CellType
 	edgeWidth := r.Config().EdgeWidth
-	xPos := (r.Config().X * edgeWidth * 2) + edgeWidth
-	yPos := (r.Config().Y * edgeWidth * 2) + edgeWidth
+	wallWidth := int32(edgeWidth / 8)
+	xPos := (r.Config().X * edgeWidth)
+	yPos := (r.Config().Y * edgeWidth)
 
 	cellColor := r.Colors().Wall
+	DEBUG := false
 
 	switch cellType {
 	case Wall:
@@ -211,34 +266,53 @@ func (v Vertex) DrawVertex(r Renderer) {
 
 	case CPU:
 		cellColor = r.Colors().CPU
+
+	case Solution:
+		cellColor = r.Colors().Solution
+
+	case EmptyCell:
+		cellColor = r.Colors().EmptyCell
 	}
 
-	if v.Visited {
+	edgeColor := r.Colors().Wall
+	if DEBUG {
+		edgeColor = r.Colors().DebugWall
+	}
+
+	if cellType == Wall {
+		if v.TopEdge == nil || v.TopEdge.IsWall || !v.GetConnectedVertex(v.TopEdge).IsPath {
+			r.DrawRectangle(xPos, yPos, edgeWidth+wallWidth, wallWidth, edgeColor)
+		}
+
+		if v.RightEdge == nil || v.RightEdge.IsWall || !v.GetConnectedVertex(v.RightEdge).IsPath {
+			r.DrawRectangle(xPos+edgeWidth, yPos, wallWidth, edgeWidth+wallWidth, edgeColor)
+		}
+
+		if v.BottomEdge == nil || v.BottomEdge.IsWall || !v.GetConnectedVertex(v.BottomEdge).IsPath {
+			r.DrawRectangle(xPos, yPos+edgeWidth, edgeWidth+wallWidth, wallWidth, edgeColor)
+		}
+
+		if v.LeftEdge == nil || v.LeftEdge.IsWall || !v.GetConnectedVertex(v.LeftEdge).IsPath {
+			r.DrawRectangle(xPos, yPos, wallWidth, edgeWidth+wallWidth, edgeColor)
+		}
+		return
+	}
+
+	if cellType == EmptyCell {
+		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
+		return
+	}
+
+	if v.IsPath {
 		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 	}
 
 	if v.IsStart {
-		r.DrawCircle(xPos+(edgeWidth/2), yPos+(edgeWidth/2), float32(edgeWidth/2), r.Colors().Start)
+		r.DrawCircle(xPos+(edgeWidth/2)+(wallWidth/2), yPos+(edgeWidth/2)+(wallWidth/2), float32(edgeWidth/2)-float32(wallWidth/2), r.Colors().Start)
 	}
 
 	if v.IsEnd {
-		r.DrawCircle(xPos+(edgeWidth/2), yPos+(edgeWidth/2), float32(edgeWidth/2), r.Colors().End)
-	}
-
-	if v.hasConnectedVertex("top") && !v.TopEdge.IsWall {
-		r.DrawRectangle(xPos, yPos-edgeWidth, edgeWidth, edgeWidth, cellColor)
-	}
-
-	if v.hasConnectedVertex("right") && !v.RightEdge.IsWall {
-		r.DrawRectangle(xPos+edgeWidth, yPos, edgeWidth, edgeWidth, cellColor)
-	}
-
-	if v.hasConnectedVertex("bottom") && !v.BottomEdge.IsWall {
-		r.DrawRectangle(xPos, yPos+edgeWidth, edgeWidth, edgeWidth, cellColor)
-	}
-
-	if v.hasConnectedVertex("left") && !v.LeftEdge.IsWall {
-		r.DrawRectangle(xPos-edgeWidth, yPos, edgeWidth, edgeWidth, cellColor)
+		r.DrawCircle(xPos+(edgeWidth/2)+(wallWidth/2), yPos+(edgeWidth/2)+(wallWidth/2), float32(edgeWidth/2)-float32(wallWidth/2), r.Colors().End)
 	}
 }
 

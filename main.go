@@ -4,6 +4,7 @@ package main
 import (
 	"maze/generate"
 	render "maze/render/draw"
+	"maze/solver"
 )
 
 func main() {
@@ -12,5 +13,7 @@ func main() {
 		panic(err)
 	}
 
-	render.Draw(maze)
+	solution := solver.Solve(maze.Matrix)
+
+	render.Draw(maze, solution)
 }

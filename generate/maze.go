@@ -122,14 +122,14 @@ func Generate() (Maze, error) {
 
 	currentVertex := matrix[0][0]
 	currentVertex.IsStart = true
+	currentVertex.IsPath = true
 
 	cartesianDistanceFromStart := 0
 	endGoalPlaced := false
 
 	mazeIncomplete := false
-
+	isBacktracking := false
 	for i := 0; i < 10000; i++ {
-		currentVertex.Visited = true
 		nextVertex, err := currentVertex.GetNextVertex()
 		if nextVertex == nil || err != nil {
 			currentVertex, err = history.Pop()
@@ -138,6 +138,7 @@ func Generate() (Maze, error) {
 			}
 			allSteps.Push(currentVertex)
 			backtracking.Push(currentVertex)
+			isBacktracking = true
 			continue
 		}
 
@@ -148,9 +149,13 @@ func Generate() (Maze, error) {
 			endGoalPlaced = true
 		}
 
-		history.Push(currentVertex)
+		currentVertex.IsPath = true
+		if !isBacktracking {
+			history.Push(currentVertex)
+		}
 		allSteps.Push(currentVertex)
 		currentVertex = nextVertex
+		isBacktracking = false
 	}
 
 	if mazeIncomplete {

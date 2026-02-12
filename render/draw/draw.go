@@ -3,7 +3,6 @@ package render
 
 import (
 	"flag"
-	"fmt"
 	"image/color"
 	"strconv"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"maze/config"
 	"maze/generate"
 	"maze/internal/grid"
+	"maze/internal/stack"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -54,12 +54,11 @@ func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors) Ray
 	}
 }
 
-func Draw(maze generate.Maze) {
+func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	intervalPtr := flag.Int("interval", 5, "set the rendering interval")
 	flag.Parse()
 
-	fmt.Println(intervalPtr)
 	if *debugPtr {
 		DEBUG = true
 	}
@@ -67,8 +66,10 @@ func Draw(maze generate.Maze) {
 	colors := grid.Colors{
 		Start:     rl.DarkPurple,
 		End:       rl.Green,
-		Wall:      rl.White,
+		Wall:      rl.Black,
+		EmptyCell: rl.Brown,
 		Cell:      rl.White,
+		Solution:  rl.Red,
 		Text:      rl.Red,
 		CPU:       rl.Blue,
 		DebugWall: rl.Beige,
@@ -130,6 +131,30 @@ func Draw(maze generate.Maze) {
 							e.DrawText(r, strconv.Itoa(backTracked), 13)
 						}
 					}
+
+					solutionStep := solution.FindOrder(e)
+					if solutionStep != -1 {
+						r = NewRaylibRenderer(i, j, grid.Solution, colors)
+						e.DrawVertex(r)
+					}
+				} else {
+					// Draw empty cell
+					r := NewRaylibRenderer(i, j, grid.EmptyCell, colors)
+					empty := grid.Vertex{
+						IsPath:          false,
+						VisitedBySolver: false,
+					}
+					empty.DrawVertex(r)
+				}
+			}
+		}
+
+		for i := range matrixToDraw {
+			for j := range matrixToDraw[i] {
+				e := matrixToDraw[i][j]
+				if e != nil {
+					r := NewRaylibRenderer(i, j, grid.Wall, colors)
+					e.DrawVertex(r)
 				}
 			}
 		}
