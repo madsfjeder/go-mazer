@@ -14,9 +14,9 @@ func Solve(maze [][]*grid.Vertex) stack.Stack[*grid.Vertex] {
 	currentVertex := maze[0][0]
 	currentVertex.VisitedBySolver = true
 	isBacktracking := false
+	var backtrackingRootVertex *grid.Vertex
 
-	return history
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10000; i++ {
 		if currentVertex.IsEnd {
 			history.Push(currentVertex)
 			break
@@ -31,19 +31,27 @@ func Solve(maze [][]*grid.Vertex) stack.Stack[*grid.Vertex] {
 				break
 			}
 			currentVertex = v
+			backtrackingRootVertex = v
 			isBacktracking = true
-			currentVertex.VisitedBySolver = true
 			continue
+		}
+
+		if isBacktracking && backtrackingRootVertex != nil {
+			var zero *grid.Vertex
+			history.Push(backtrackingRootVertex)
+			backtrackingRootVertex = zero
 		}
 
 		if !isBacktracking {
 			history.Push(currentVertex)
 		}
 
-		currentVertex.VisitedBySolver = true
 		currentVertex = nextVertex
 		isBacktracking = false
+		currentVertex.VisitedBySolver = true
 	}
+
+	fmt.Println("solution len", history.Length())
 
 	return history
 }

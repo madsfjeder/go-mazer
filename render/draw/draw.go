@@ -12,6 +12,7 @@ import (
 	"maze/internal/grid"
 	"maze/internal/stack"
 
+	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -54,9 +55,105 @@ func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors) Ray
 	}
 }
 
+type GuiElement interface {
+	Render(xPos, yPos float32)
+}
+
+type baseElement struct {
+	width  int32
+	height int32
+}
+
+type Button struct {
+	baseElement
+	text    string
+	onClick func()
+}
+
+func (b *Button) Render(xPos, yPos float32) {
+	clicked := gui.Button(
+		rl.NewRectangle(
+			xPos,
+			yPos,
+			float32(b.baseElement.width),
+			float32(b.baseElement.height)),
+		b.text,
+	)
+
+	if clicked {
+		b.onClick()
+	}
+}
+
+type Slider struct {
+	baseElement
+	textLeft  string
+	textRight string
+	value     float32
+}
+
+func (s *Slider) Render(xPos, yPos float32) {
+	interval := gui.Slider(
+		rl.NewRectangle(
+			xPos+30,
+			yPos,
+			float32(s.baseElement.width),
+			float32(s.baseElement.height),
+		),
+		s.textLeft,
+		s.textRight,
+		s.value,
+		0,
+		2000,
+	)
+
+	s.value = interval
+}
+
+func drawGui(elements []GuiElement) {
+	xPos := config.EdgeWidth / 2
+	yPos := config.EdgeWidth / 2
+	yOffset := 50
+
+	rl.DrawRectangle(
+		xPos,
+		yPos,
+		config.MenuBarWidth-(config.EdgeWidth/8),
+		config.MenuBarHeight-(config.EdgeWidth/2),
+		rl.White,
+	)
+
+	for i, element := range elements {
+		y := int32(i)*int32(yOffset) + yPos + 10
+		element.Render(
+			float32(xPos+20),
+			float32(y),
+		)
+
+	}
+}
+
+func setup(
+	maze generate.Maze,
+) ([][]*grid.Vertex, stack.Stack[*grid.Vertex], *grid.Vertex) {
+	reversedSteps := maze.Steps.Copy()
+	reversedSteps.Reverse()
+
+	matrixToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
+
+	for i := range matrixToDraw {
+		matrixToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
+	}
+
+	var elementToDraw *grid.Vertex
+
+	return matrixToDraw, reversedSteps, elementToDraw
+}
+
 func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
+	generatedMaze := maze
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
-	intervalPtr := flag.Int("interval", 5, "set the rendering interval")
+	intervalPtr := flag.Int("interval", 1, "set the rendering interval")
 	flag.Parse()
 
 	if *debugPtr {
@@ -75,45 +172,83 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		DebugWall: rl.Beige,
 	}
 
+	var timeAcc int64 = 0
+	interval := int64(*intervalPtr)
+	prevTime := time.Now()
+
+	matrixToDraw, steps, elementToDraw := setup(maze)
+
+	guiElements := make([]GuiElement, 0)
+
+	btn := &Button{
+		baseElement: baseElement{
+			width:  100,
+			height: 40,
+		},
+		text: "Reset",
+		onClick: func() {
+			newMaze, err := generate.Generate()
+			generatedMaze = newMaze
+			matrixToDraw, steps, elementToDraw = setup(newMaze)
+
+			if err != nil {
+				panic(0)
+			}
+			timeAcc = 0
+		},
+	}
+
+	slider := &Slider{
+		baseElement: baseElement{
+			width:  100,
+			height: 20,
+		},
+		value:     float32(interval),
+		textLeft:  "Slower",
+		textRight: "Faster",
+	}
+
+	guiElements = append(guiElements, btn, slider)
+
 	rl.InitWindow(config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, "Mazen")
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(60)
-
-	reversedSteps := maze.Steps.Copy()
-	reversedSteps.Reverse()
-
-	var timeAcc int64 = 0
-	interval := int64(*intervalPtr)
-	prevTime := time.Now()
-	matrixToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
-
-	for i := range matrixToDraw {
-		matrixToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
-	}
-
-	var elementToDraw *grid.Vertex
-
 	rl.DrawRectangle(0, 0, config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, rl.Black)
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
-		delta := time.Since(prevTime)
-		timeAcc += delta.Milliseconds()
-		if timeAcc >= interval {
-			timeAcc -= interval
-			e, _ := reversedSteps.Pop()
-			elementToDraw = e
+
+		drawGui(guiElements)
+
+		elementsToDraw := make([]*grid.Vertex, 0)
+
+		if interval > 0 {
+			delta := time.Since(prevTime)
+			timeAcc += delta.Milliseconds()
+
+			for timeAcc >= interval {
+				timeAcc -= interval
+				e, _ := steps.Pop()
+				elementsToDraw = append(elementsToDraw, e)
+			}
+		} else {
+			elementsToDraw = steps.PopAll()
+		}
+
+		if len(elementsToDraw) > 0 {
+			elementToDraw = elementsToDraw[len(elementsToDraw)-1]
 		}
 
 		var x, y int
-		for i := range maze.Matrix {
-			for j := range maze.Matrix {
-				v := maze.Matrix[i][j]
-				if v == elementToDraw {
-					x = i
-					y = j
-					matrixToDraw[i][j] = elementToDraw
-					break
+		for i := range generatedMaze.Matrix {
+			for j := range generatedMaze.Matrix[i] {
+				v := generatedMaze.Matrix[i][j]
+				for _, toDraw := range elementsToDraw {
+					if v == toDraw {
+						x = i
+						y = j
+						matrixToDraw[i][j] = toDraw
+					}
 				}
 			}
 		}
@@ -121,22 +256,23 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		for i := range matrixToDraw {
 			for j := range matrixToDraw[i] {
 				e := matrixToDraw[i][j]
+
 				if e != nil {
+					if e == elementToDraw {
+						continue
+					}
+
 					r := NewRaylibRenderer(i, j, grid.Path, colors)
 					e.DrawVertex(r)
+
 					if DEBUG {
-						backTracked := maze.BacktrackSteps.FindOrder(e)
+						backTracked := generatedMaze.BacktrackSteps.FindOrder(e)
 						if backTracked != -1 {
 							e.DrawVertex(r)
 							e.DrawText(r, strconv.Itoa(backTracked), 13)
 						}
 					}
 
-					solutionStep := solution.FindOrder(e)
-					if solutionStep != -1 {
-						r = NewRaylibRenderer(i, j, grid.Solution, colors)
-						e.DrawVertex(r)
-					}
 				} else {
 					// Draw empty cell
 					r := NewRaylibRenderer(i, j, grid.EmptyCell, colors)
@@ -153,6 +289,9 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 			for j := range matrixToDraw[i] {
 				e := matrixToDraw[i][j]
 				if e != nil {
+					if e == elementToDraw {
+						continue
+					}
 					r := NewRaylibRenderer(i, j, grid.Wall, colors)
 					e.DrawVertex(r)
 				}
@@ -161,7 +300,9 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 
 		if elementToDraw != nil {
 			r := NewRaylibRenderer(x, y, grid.CPU, colors)
-			elementToDraw.DrawVertex(r)
+			if false {
+				elementToDraw.DrawVertex(r)
+			}
 		}
 
 		prevTime = time.Now()

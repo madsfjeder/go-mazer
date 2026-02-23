@@ -37,6 +37,10 @@ func (s *Stack[T]) Pop() (T, error) {
 	return element, nil
 }
 
+func (s *Stack[T]) PopAll() []T {
+	return s.items
+}
+
 func (s Stack[T]) Print() {
 	for _, v := range s.items {
 		fmt.Println(v)
