@@ -4,7 +4,6 @@ package render
 import (
 	"flag"
 	"image/color"
-	"strconv"
 	"time"
 
 	"maze/config"
@@ -150,6 +149,101 @@ func setup(
 	return matrixToDraw, reversedSteps, elementToDraw
 }
 
+func drawGeneration(
+	completedMaze generate.Maze,
+	matrixToDraw [][]*grid.Vertex,
+	steps *stack.Stack[*grid.Vertex],
+	currentSolverVertex *grid.Vertex,
+	colors grid.Colors,
+	interval int64,
+	timeAcc *int64,
+	prevTime time.Time,
+) {
+	drawEveryLoop := make([]*grid.Vertex, 0)
+
+	if interval > 0 {
+		delta := time.Since(prevTime)
+		*timeAcc += delta.Milliseconds()
+
+		for *timeAcc >= interval {
+			*timeAcc -= interval
+			e, _ := steps.Pop()
+			drawEveryLoop = append(drawEveryLoop, e)
+		}
+	} else {
+		drawEveryLoop = steps.PopAll()
+	}
+
+	if len(drawEveryLoop) > 0 {
+		currentSolverVertex = drawEveryLoop[len(drawEveryLoop)-1]
+	}
+
+	var x, y int
+	for i := range completedMaze.Matrix {
+		for j := range completedMaze.Matrix[i] {
+			v := completedMaze.Matrix[i][j]
+			for _, toDraw := range drawEveryLoop {
+				if v == toDraw {
+					x = i
+					y = j
+					matrixToDraw[i][j] = toDraw
+				}
+			}
+		}
+	}
+
+	for i := range matrixToDraw {
+		for j := range matrixToDraw[i] {
+			e := matrixToDraw[i][j]
+
+			if e != nil {
+				if e == currentSolverVertex {
+					continue
+				}
+
+				r := NewRaylibRenderer(i, j, grid.Path, colors)
+				e.DrawVertex(r)
+			} else {
+				// Draw empty cell
+				r := NewRaylibRenderer(i, j, grid.EmptyCell, colors)
+				empty := grid.Vertex{
+					IsPath:          false,
+					VisitedBySolver: false,
+				}
+				empty.DrawVertex(r)
+			}
+		}
+	}
+
+	for i := range matrixToDraw {
+		for j := range matrixToDraw[i] {
+			e := matrixToDraw[i][j]
+			if e != nil {
+				if e == currentSolverVertex {
+					continue
+				}
+				r := NewRaylibRenderer(i, j, grid.Wall, colors)
+				e.DrawVertex(r)
+			}
+		}
+	}
+
+	if currentSolverVertex != nil {
+		r := NewRaylibRenderer(x, y, grid.CPU, colors)
+		if false {
+			currentSolverVertex.DrawVertex(r)
+		}
+	}
+}
+
+type State int
+
+const (
+	StateGeneration State = iota
+	StateSolving
+	StateDone
+)
+
 func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	generatedMaze := maze
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
@@ -172,11 +266,11 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		DebugWall: rl.Beige,
 	}
 
-	var timeAcc int64 = 0
 	interval := int64(*intervalPtr)
-	prevTime := time.Now()
 
-	matrixToDraw, steps, elementToDraw := setup(maze)
+	matrixToDraw, steps, currentSolverVertex := setup(maze)
+
+	var generationTimeAcc int64 = 0
 
 	guiElements := make([]GuiElement, 0)
 
@@ -189,12 +283,12 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		onClick: func() {
 			newMaze, err := generate.Generate()
 			generatedMaze = newMaze
-			matrixToDraw, steps, elementToDraw = setup(newMaze)
+			matrixToDraw, steps, currentSolverVertex = setup(newMaze)
 
 			if err != nil {
 				panic(0)
 			}
-			timeAcc = 0
+			generationTimeAcc = 0
 		},
 	}
 
@@ -209,7 +303,9 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	}
 
 	guiElements = append(guiElements, btn, slider)
+	state := StateGeneration
 
+	prevTime := time.Now()
 	rl.InitWindow(config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, "Mazen")
 	defer rl.CloseWindow()
 
@@ -220,88 +316,27 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 
 		drawGui(guiElements)
 
-		elementsToDraw := make([]*grid.Vertex, 0)
-
-		if interval > 0 {
-			delta := time.Since(prevTime)
-			timeAcc += delta.Milliseconds()
-
-			for timeAcc >= interval {
-				timeAcc -= interval
-				e, _ := steps.Pop()
-				elementsToDraw = append(elementsToDraw, e)
+		switch state {
+		case StateGeneration:
+			{
+				drawGeneration(
+					generatedMaze,
+					matrixToDraw,
+					&steps,
+					currentSolverVertex,
+					colors,
+					interval,
+					&generationTimeAcc,
+					prevTime,
+				)
 			}
-		} else {
-			elementsToDraw = steps.PopAll()
-		}
 
-		if len(elementsToDraw) > 0 {
-			elementToDraw = elementsToDraw[len(elementsToDraw)-1]
-		}
-
-		var x, y int
-		for i := range generatedMaze.Matrix {
-			for j := range generatedMaze.Matrix[i] {
-				v := generatedMaze.Matrix[i][j]
-				for _, toDraw := range elementsToDraw {
-					if v == toDraw {
-						x = i
-						y = j
-						matrixToDraw[i][j] = toDraw
-					}
-				}
+		case StateSolving:
+			{
 			}
-		}
 
-		for i := range matrixToDraw {
-			for j := range matrixToDraw[i] {
-				e := matrixToDraw[i][j]
-
-				if e != nil {
-					if e == elementToDraw {
-						continue
-					}
-
-					r := NewRaylibRenderer(i, j, grid.Path, colors)
-					e.DrawVertex(r)
-
-					if DEBUG {
-						backTracked := generatedMaze.BacktrackSteps.FindOrder(e)
-						if backTracked != -1 {
-							e.DrawVertex(r)
-							e.DrawText(r, strconv.Itoa(backTracked), 13)
-						}
-					}
-
-				} else {
-					// Draw empty cell
-					r := NewRaylibRenderer(i, j, grid.EmptyCell, colors)
-					empty := grid.Vertex{
-						IsPath:          false,
-						VisitedBySolver: false,
-					}
-					empty.DrawVertex(r)
-				}
-			}
-		}
-
-		for i := range matrixToDraw {
-			for j := range matrixToDraw[i] {
-				e := matrixToDraw[i][j]
-				if e != nil {
-					if e == elementToDraw {
-						continue
-					}
-					r := NewRaylibRenderer(i, j, grid.Wall, colors)
-					e.DrawVertex(r)
-				}
-			}
-		}
-
-		if elementToDraw != nil {
-			r := NewRaylibRenderer(x, y, grid.CPU, colors)
-			if false {
-				elementToDraw.DrawVertex(r)
+		case StateDone:
+			{
 			}
 		}
 
