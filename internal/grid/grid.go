@@ -306,11 +306,33 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	}
 
 	if cellType == Solution {
-		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, r.Colors().Solution)
+		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && v.GetConnectedVertex(v.LeftEdge).IsPath
+		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && v.GetConnectedVertex(v.BottomEdge).IsPath
+		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsPath
+		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsPath
+
+		padding := edgeWidth / 4
+
+		if hasLeftPath {
+			r.DrawRectangle(xPos, yPos+padding, edgeWidth/2, edgeWidth-edgeWidth/2, r.Colors().Solution)
+		}
+
+		if hasBottomPath {
+			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, edgeWidth-edgeWidth/2, edgeWidth/2, r.Colors().Solution)
+		}
+
+		if hasRightPath {
+			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, edgeWidth/2, edgeWidth-edgeWidth/2, r.Colors().Solution)
+		}
+
+		if hasTopPath {
+			r.DrawRectangle(xPos+padding, yPos, edgeWidth-edgeWidth/2, edgeWidth/2, r.Colors().Solution)
+		}
+
 		return
 	}
 
-	if v.IsPath {
+	if v.IsPath && cellType != Solution {
 		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 	}
 
