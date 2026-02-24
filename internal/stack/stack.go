@@ -38,7 +38,10 @@ func (s *Stack[T]) Pop() (T, error) {
 }
 
 func (s *Stack[T]) PopAll() []T {
-	return s.items
+	val := s.items
+	s.items = make([]T, 0)
+
+	return val
 }
 
 func (s Stack[T]) Print() {

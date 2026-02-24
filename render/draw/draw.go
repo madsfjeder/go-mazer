@@ -158,6 +158,7 @@ func drawGeneration(
 	interval int64,
 	timeAcc *int64,
 	prevTime time.Time,
+	onComplete func(),
 ) {
 	drawEveryLoop := make([]*grid.Vertex, 0)
 
@@ -172,6 +173,11 @@ func drawGeneration(
 		}
 	} else {
 		drawEveryLoop = steps.PopAll()
+	}
+
+	if steps.Length() == 0 {
+		onComplete()
+		return
 	}
 
 	if len(drawEveryLoop) > 0 {
@@ -236,6 +242,53 @@ func drawGeneration(
 	}
 }
 
+func drawSolver(
+	completedMaze generate.Maze,
+	matrixToDraw [][]*grid.Vertex,
+	solution *stack.Stack[*grid.Vertex],
+	colors grid.Colors,
+	interval int64,
+	prevTime time.Time,
+	timeAcc *int64,
+) {
+	drawEveryLoop := make([]*grid.Vertex, 0)
+
+	if interval > 0 {
+		delta := time.Since(prevTime)
+		*timeAcc += delta.Milliseconds()
+
+		for *timeAcc >= interval {
+			*timeAcc -= interval
+			e, _ := solution.Pop()
+			drawEveryLoop = append(drawEveryLoop, e)
+		}
+	} else {
+		drawEveryLoop = solution.PopAll()
+	}
+
+	for i := range completedMaze.Matrix {
+		for j := range completedMaze.Matrix[i] {
+			v := completedMaze.Matrix[i][j]
+			for _, toDraw := range drawEveryLoop {
+				if v == toDraw {
+					matrixToDraw[i][j] = toDraw
+				}
+			}
+		}
+	}
+
+	for i := range matrixToDraw {
+		for j := range matrixToDraw[i] {
+			e := matrixToDraw[i][j]
+
+			if e != nil {
+				r := NewRaylibRenderer(i, j, grid.Solution, colors)
+				e.DrawVertex(r)
+			}
+		}
+	}
+}
+
 type State int
 
 const (
@@ -246,6 +299,7 @@ const (
 
 func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	generatedMaze := maze
+	solution.Reverse()
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	intervalPtr := flag.Int("interval", 1, "set the rendering interval")
 	flag.Parse()
@@ -269,6 +323,10 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	interval := int64(*intervalPtr)
 
 	matrixToDraw, steps, currentSolverVertex := setup(maze)
+	solutionToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
+	for i := range solutionToDraw {
+		solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
+	}
 
 	var generationTimeAcc int64 = 0
 
@@ -328,11 +386,24 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 					interval,
 					&generationTimeAcc,
 					prevTime,
+					func() {
+						state = StateSolving
+						generationTimeAcc = 0
+					},
 				)
 			}
 
 		case StateSolving:
 			{
+				drawSolver(
+					generatedMaze,
+					solutionToDraw,
+					&solution,
+					colors,
+					interval,
+					prevTime,
+					&generationTimeAcc,
+				)
 			}
 
 		case StateDone:

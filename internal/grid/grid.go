@@ -305,6 +305,11 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		return
 	}
 
+	if cellType == Solution {
+		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, r.Colors().Solution)
+		return
+	}
+
 	if v.IsPath {
 		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 	}
