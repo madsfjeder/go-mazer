@@ -18,14 +18,15 @@ type Edge struct {
 }
 
 type Vertex struct {
-	IsPath          bool
-	IsStart         bool
-	IsEnd           bool
-	VisitedBySolver bool
-	TopEdge         *Edge
-	RightEdge       *Edge
-	BottomEdge      *Edge
-	LeftEdge        *Edge
+	IsPath           bool
+	IsStart          bool
+	IsEnd            bool
+	IsPartOfSolution bool
+	VisitedBySolver  bool
+	TopEdge          *Edge
+	RightEdge        *Edge
+	BottomEdge       *Edge
+	LeftEdge         *Edge
 }
 
 // GetNextVertex - For generation
@@ -243,6 +244,7 @@ type Config struct {
 
 type Renderer interface {
 	DrawRectangle(xPos, yPos, width, height int32, color color.RGBA)
+	DrawRectangleRounded(xPos, yPos, width, height int32, roundness float32, color color.RGBA)
 	DrawText(text string, xPos, yPos, fontSize int32, color color.RGBA)
 	DrawCircle(x, y int32, radius float32, color color.RGBA)
 	Config() Config
@@ -306,27 +308,30 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	}
 
 	if cellType == Solution {
-		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && v.GetConnectedVertex(v.LeftEdge).IsPath
-		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && v.GetConnectedVertex(v.BottomEdge).IsPath
-		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsPath
-		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsPath
+		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && v.GetConnectedVertex(v.LeftEdge).IsPartOfSolution
+		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && v.GetConnectedVertex(v.BottomEdge).IsPartOfSolution
+		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsPartOfSolution
+		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsPartOfSolution
 
-		padding := edgeWidth / 4
+		padding := edgeWidth/4 + 1
+		pathWidth := edgeWidth / 2
+
+		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, r.Colors().Solution)
 
 		if hasLeftPath {
-			r.DrawRectangle(xPos, yPos+padding, edgeWidth/2, edgeWidth-edgeWidth/2, r.Colors().Solution)
+			r.DrawRectangle(xPos, yPos+padding, pathWidth, pathWidth, r.Colors().Solution)
 		}
 
 		if hasBottomPath {
-			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, edgeWidth-edgeWidth/2, edgeWidth/2, r.Colors().Solution)
+			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, pathWidth, pathWidth, r.Colors().Solution)
 		}
 
 		if hasRightPath {
-			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, edgeWidth/2, edgeWidth-edgeWidth/2, r.Colors().Solution)
+			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, pathWidth, pathWidth, r.Colors().Solution)
 		}
 
 		if hasTopPath {
-			r.DrawRectangle(xPos+padding, yPos, edgeWidth-edgeWidth/2, edgeWidth/2, r.Colors().Solution)
+			r.DrawRectangle(xPos+padding, yPos, pathWidth, pathWidth, r.Colors().Solution)
 		}
 
 		return

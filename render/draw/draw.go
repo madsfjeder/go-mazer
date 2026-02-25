@@ -10,6 +10,7 @@ import (
 	"maze/generate"
 	"maze/internal/grid"
 	"maze/internal/stack"
+	"maze/solver"
 
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -24,6 +25,10 @@ type RaylibRenderer struct {
 
 func (r RaylibRenderer) DrawRectangle(x, y, width, height int32, color color.RGBA) {
 	rl.DrawRectangle(x, y, width, height, color)
+}
+
+func (r RaylibRenderer) DrawRectangleRounded(x, y, width, height int32, roundness float32, color color.RGBA) {
+	rl.DrawRectangleRounded(rl.NewRectangle(float32(x), float32(y), float32(width), float32(height)), roundness, 4, color)
 }
 
 func (r RaylibRenderer) DrawText(text string, x, y, fontSize int32, color color.RGBA) {
@@ -299,7 +304,8 @@ const (
 
 func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	generatedMaze := maze
-	solution.Reverse()
+	generatedSolution := solution
+	generatedSolution.Reverse()
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	intervalPtr := flag.Int("interval", 1, "set the rendering interval")
 	flag.Parse()
@@ -328,6 +334,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
 	}
 
+	state := StateGeneration
 	var generationTimeAcc int64 = 0
 
 	guiElements := make([]GuiElement, 0)
@@ -342,11 +349,18 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 			newMaze, err := generate.Generate()
 			generatedMaze = newMaze
 			matrixToDraw, steps, currentSolverVertex = setup(newMaze)
+			generatedSolution = solver.Solve(generatedMaze.Matrix)
+			generatedSolution.Reverse()
+			solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
+			for i := range solutionToDraw {
+				solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
+			}
 
 			if err != nil {
 				panic(0)
 			}
 			generationTimeAcc = 0
+			state = StateGeneration
 		},
 	}
 
@@ -361,7 +375,6 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	}
 
 	guiElements = append(guiElements, btn, slider)
-	state := StateGeneration
 
 	prevTime := time.Now()
 	rl.InitWindow(config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, "Mazen")
@@ -398,7 +411,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 				drawSolver(
 					generatedMaze,
 					solutionToDraw,
-					&solution,
+					&generatedSolution,
 					colors,
 					interval,
 					prevTime,
