@@ -23,10 +23,53 @@ type Vertex struct {
 	IsEnd            bool
 	IsPartOfSolution bool
 	VisitedBySolver  bool
+	IsSplit          bool
 	TopEdge          *Edge
 	RightEdge        *Edge
 	BottomEdge       *Edge
 	LeftEdge         *Edge
+}
+
+func (v *Vertex) CanSplit() bool {
+	var upVertex *Vertex
+	var rightVertex *Vertex
+	var bottomVertex *Vertex
+	var leftVertex *Vertex
+
+	options := make([]string, 0)
+
+	if v.TopEdge != nil {
+		upVertex = v.GetConnectedVertex(v.TopEdge)
+
+		if upVertex != nil && !upVertex.IsPath && !upVertex.VisitedBySolver {
+			options = append(options, "up")
+		}
+	}
+
+	if v.RightEdge != nil {
+		rightVertex = v.GetConnectedVertex(v.RightEdge)
+		if rightVertex != nil && !rightVertex.IsPath && !rightVertex.VisitedBySolver {
+			options = append(options, "right")
+		}
+	}
+
+	if v.BottomEdge != nil {
+		bottomVertex = v.GetConnectedVertex(v.BottomEdge)
+
+		if bottomVertex != nil && !bottomVertex.IsPath && !bottomVertex.VisitedBySolver {
+			options = append(options, "down")
+		}
+	}
+
+	if v.LeftEdge != nil {
+		leftVertex = v.GetConnectedVertex(v.LeftEdge)
+
+		if leftVertex != nil && !leftVertex.IsPath && !leftVertex.VisitedBySolver {
+			options = append(options, "left")
+		}
+	}
+
+	return len(options) > 1
 }
 
 // GetNextVertex - For generation
@@ -215,6 +258,7 @@ func (v *Vertex) Copy() Vertex {
 type Colors struct {
 	Start     color.RGBA
 	End       color.RGBA
+	Split     color.RGBA
 	Solution  color.RGBA
 	Wall      color.RGBA
 	EmptyCell color.RGBA
@@ -228,6 +272,7 @@ type CellType int
 
 const (
 	Wall CellType = iota
+	Split
 	EmptyCell
 	Path
 	CPU
@@ -276,6 +321,10 @@ func (v *Vertex) DrawVertex(r Renderer) {
 
 	case EmptyCell:
 		cellColor = r.Colors().EmptyCell
+
+	case Split:
+		// Change to highlight splits
+		cellColor = r.Colors().Cell
 	}
 
 	edgeColor := r.Colors().Wall
@@ -313,7 +362,7 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsPartOfSolution
 		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsPartOfSolution
 
-		padding := edgeWidth/4 + 1
+		padding := edgeWidth/4 + 2
 		pathWidth := edgeWidth / 2
 
 		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, r.Colors().Solution)

@@ -185,18 +185,11 @@ func drawGeneration(
 		return
 	}
 
-	if len(drawEveryLoop) > 0 {
-		currentSolverVertex = drawEveryLoop[len(drawEveryLoop)-1]
-	}
-
-	var x, y int
 	for i := range completedMaze.Matrix {
 		for j := range completedMaze.Matrix[i] {
 			v := completedMaze.Matrix[i][j]
 			for _, toDraw := range drawEveryLoop {
 				if v == toDraw {
-					x = i
-					y = j
 					matrixToDraw[i][j] = toDraw
 				}
 			}
@@ -212,7 +205,13 @@ func drawGeneration(
 					continue
 				}
 
-				r := NewRaylibRenderer(i, j, grid.Path, colors)
+				cellType := grid.Path
+
+				if e.IsSplit {
+					cellType = grid.Split
+				}
+
+				r := NewRaylibRenderer(i, j, cellType, colors)
 				e.DrawVertex(r)
 			} else {
 				// Draw empty cell
@@ -236,13 +235,6 @@ func drawGeneration(
 				r := NewRaylibRenderer(i, j, grid.Wall, colors)
 				e.DrawVertex(r)
 			}
-		}
-	}
-
-	if currentSolverVertex != nil {
-		r := NewRaylibRenderer(x, y, grid.CPU, colors)
-		if false {
-			currentSolverVertex.DrawVertex(r)
 		}
 	}
 }
@@ -318,6 +310,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		Start:     rl.DarkPurple,
 		End:       rl.Green,
 		Wall:      rl.Black,
+		Split:     rl.Magenta,
 		EmptyCell: rl.Brown,
 		Cell:      rl.White,
 		Solution:  rl.Red,

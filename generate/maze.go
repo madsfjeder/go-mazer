@@ -3,6 +3,7 @@ package generate
 
 import (
 	"errors"
+	"math/rand"
 
 	"maze/config"
 	"maze/internal/grid"
@@ -13,6 +14,14 @@ type Maze struct {
 	Matrix         [][]*grid.Vertex
 	Steps          stack.Stack[*grid.Vertex]
 	BacktrackSteps stack.Stack[*grid.Vertex]
+}
+
+// For making random decisions
+// Ex. if you want a 10% chance of returning true - rollArbitraryDice(n = 10)
+func rollArbitraryDice(n int) bool {
+	num := rand.Intn(n)
+
+	return num == n-1
 }
 
 func getDistanceFromStart(currentVertex *grid.Vertex, matrix [][]*grid.Vertex) int {
@@ -124,13 +133,36 @@ func Generate() (Maze, error) {
 	currentVertex.IsStart = true
 	currentVertex.IsPath = true
 
+	var currentSplitVertex *grid.Vertex
+
 	cartesianDistanceFromStart := 0
 	endGoalPlaced := false
 
 	mazeIncomplete := false
 	isBacktracking := false
 	for i := 0; i < 10000; i++ {
+		shouldSplit := false
+
+		if currentSplitVertex == nil {
+			shouldSplit = rollArbitraryDice(10)
+
+			if shouldSplit {
+				currentSplitVertex = currentVertex
+				currentSplitVertex.IsSplit = true
+			}
+		}
+
+		if currentSplitVertex != nil {
+			shouldRevertToSplit := rollArbitraryDice(30)
+			if shouldRevertToSplit {
+				var zero *grid.Vertex
+				currentVertex = currentSplitVertex
+				currentSplitVertex = zero
+			}
+		}
+
 		nextVertex, err := currentVertex.GetNextVertex()
+
 		if nextVertex == nil || err != nil {
 			currentVertex, err = history.Pop()
 			if err != nil || currentVertex == nil {
