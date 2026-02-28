@@ -422,6 +422,11 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		return
 	}
 
+	if cellType == CPU {
+		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
+		return
+	}
+
 	if v.IsPath && cellType != Solution {
 		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 	}

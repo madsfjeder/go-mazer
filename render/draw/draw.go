@@ -266,6 +266,8 @@ func drawSolver(
 	prevTime time.Time,
 	timeAcc *int64,
 ) {
+	// Corresponds to the "CPU" exploring the maze. ie the current position
+	var newestElement *grid.Vertex
 	drawEveryLoop := make([]*grid.Vertex, 0)
 
 	if interval > 0 {
@@ -283,6 +285,13 @@ func drawSolver(
 		drawEveryLoop = append(drawEveryLoop, s...)
 	}
 
+	if len(drawEveryLoop) > 0 {
+		newestElement = drawEveryLoop[len(drawEveryLoop)-1]
+	}
+
+	newestElementX := 0
+	newestElementY := 0
+
 	for i := range completedMaze.Matrix {
 		for j := range completedMaze.Matrix[i] {
 			v := completedMaze.Matrix[i][j]
@@ -290,6 +299,11 @@ func drawSolver(
 				if v == toDraw {
 					matrixToDraw[i][j] = toDraw
 				}
+			}
+
+			if newestElement != nil && v == newestElement {
+				newestElementX = i
+				newestElementY = j
 			}
 		}
 	}
@@ -307,6 +321,11 @@ func drawSolver(
 				e.DrawVertex(r)
 			}
 		}
+	}
+
+	if newestElement != nil {
+		r := NewRaylibRenderer(newestElementX, newestElementY, grid.CPU, colors)
+		newestElement.DrawVertex(r)
 	}
 }
 
