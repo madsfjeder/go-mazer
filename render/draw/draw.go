@@ -79,8 +79,8 @@ func (b *Button) Render(xPos, yPos float32) {
 		rl.NewRectangle(
 			xPos,
 			yPos,
-			float32(b.baseElement.width),
-			float32(b.baseElement.height)),
+			float32(b.width),
+			float32(b.height)),
 		b.text,
 	)
 
@@ -101,8 +101,8 @@ func (s *Slider) Render(xPos, yPos float32) {
 		rl.NewRectangle(
 			xPos+30,
 			yPos,
-			float32(s.baseElement.width),
-			float32(s.baseElement.height),
+			float32(s.width),
+			float32(s.height),
 		),
 		s.textLeft,
 		s.textRight,
@@ -114,10 +114,30 @@ func (s *Slider) Render(xPos, yPos float32) {
 	s.value = interval
 }
 
+type Toggle struct {
+	baseElement
+	text   string
+	active *bool
+}
+
+func (t *Toggle) Render(xPos, yPos float32) {
+	active := gui.Toggle(
+		rl.NewRectangle(
+			xPos,
+			yPos,
+			float32(t.width),
+			float32(t.height),
+		),
+		t.text,
+		*t.active,
+	)
+
+	t.active = &active
+}
+
 func drawGui(elements []GuiElement) {
 	xPos := config.EdgeWidth / 2
 	yPos := config.EdgeWidth / 2
-	yOffset := 50
 
 	rl.DrawRectangle(
 		xPos,
@@ -128,10 +148,10 @@ func drawGui(elements []GuiElement) {
 	)
 
 	for i, element := range elements {
-		y := int32(i)*int32(yOffset) + yPos + 10
+		x := xPos + int32(i)*200
 		element.Render(
-			float32(xPos+20),
-			float32(y),
+			float32(x),
+			float32(yPos+config.EdgeWidth),
 		)
 
 	}
@@ -180,11 +200,6 @@ func drawGeneration(
 		drawEveryLoop = steps.PopAll()
 	}
 
-	if steps.Length() == 0 {
-		onComplete()
-		return
-	}
-
 	for i := range completedMaze.Matrix {
 		for j := range completedMaze.Matrix[i] {
 			v := completedMaze.Matrix[i][j]
@@ -214,7 +229,6 @@ func drawGeneration(
 				r := NewRaylibRenderer(i, j, cellType, colors)
 				e.DrawVertex(r)
 			} else {
-				// Draw empty cell
 				r := NewRaylibRenderer(i, j, grid.EmptyCell, colors)
 				empty := grid.Vertex{
 					IsPath:          false,
@@ -236,6 +250,10 @@ func drawGeneration(
 				e.DrawVertex(r)
 			}
 		}
+	}
+
+	if steps.Length() == 0 {
+		onComplete()
 	}
 }
 
@@ -260,7 +278,9 @@ func drawSolver(
 			drawEveryLoop = append(drawEveryLoop, e)
 		}
 	} else {
-		drawEveryLoop = solution.PopAll()
+		s := solution.PopAll()
+
+		drawEveryLoop = append(drawEveryLoop, s...)
 	}
 
 	for i := range completedMaze.Matrix {
@@ -279,7 +299,11 @@ func drawSolver(
 			e := matrixToDraw[i][j]
 
 			if e != nil {
-				r := NewRaylibRenderer(i, j, grid.Solution, colors)
+				cellType := grid.Solution
+				if e.IsBacktracking {
+					cellType = grid.Backtracking
+				}
+				r := NewRaylibRenderer(i, j, cellType, colors)
 				e.DrawVertex(r)
 			}
 		}
@@ -299,7 +323,6 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	generatedSolution := solution
 	generatedSolution.Reverse()
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
-	intervalPtr := flag.Int("interval", 1, "set the rendering interval")
 	flag.Parse()
 
 	if *debugPtr {
@@ -307,19 +330,21 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	}
 
 	colors := grid.Colors{
-		Start:     rl.DarkPurple,
-		End:       rl.Green,
-		Wall:      rl.Black,
-		Split:     rl.Magenta,
-		EmptyCell: rl.Brown,
-		Cell:      rl.White,
-		Solution:  rl.Red,
-		Text:      rl.Red,
-		CPU:       rl.Blue,
-		DebugWall: rl.Beige,
+		Start:        rl.DarkPurple,
+		End:          rl.Green,
+		Wall:         rl.Black,
+		Backtracking: rl.Magenta,
+		Split:        rl.Magenta,
+		EmptyCell:    rl.Brown,
+		Cell:         rl.White,
+		Solution:     rl.Red,
+		Text:         rl.Red,
+		CPU:          rl.Blue,
+		DebugWall:    rl.Beige,
 	}
 
-	interval := int64(*intervalPtr)
+	var generateDrawInterval int64 = 0
+	var solveDrawInterval int64 = 15
 
 	matrixToDraw, steps, currentSolverVertex := setup(maze)
 	solutionToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
@@ -362,12 +387,23 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 			width:  100,
 			height: 20,
 		},
-		value:     float32(interval),
+		value:     float32(solveDrawInterval),
 		textLeft:  "Slower",
 		textRight: "Faster",
 	}
 
-	guiElements = append(guiElements, btn, slider)
+	showBacktracking := false
+
+	toggle := &Toggle{
+		baseElement: baseElement{
+			width:  100,
+			height: 20,
+		},
+		text:   "Show backtracking",
+		active: &showBacktracking,
+	}
+
+	guiElements = append(guiElements, btn, slider, toggle)
 
 	prevTime := time.Now()
 	rl.InitWindow(config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, "Mazen")
@@ -379,42 +415,33 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		rl.BeginDrawing()
 
 		drawGui(guiElements)
+		drawGeneration(
+			generatedMaze,
+			matrixToDraw,
+			&steps,
+			currentSolverVertex,
+			colors,
+			generateDrawInterval,
+			&generationTimeAcc,
+			prevTime,
+			func() {
+				if state == StateGeneration {
+					state = StateSolving
+					generationTimeAcc = 0
+				}
+			},
+		)
 
-		switch state {
-		case StateGeneration:
-			{
-				drawGeneration(
-					generatedMaze,
-					matrixToDraw,
-					&steps,
-					currentSolverVertex,
-					colors,
-					interval,
-					&generationTimeAcc,
-					prevTime,
-					func() {
-						state = StateSolving
-						generationTimeAcc = 0
-					},
-				)
-			}
-
-		case StateSolving:
-			{
-				drawSolver(
-					generatedMaze,
-					solutionToDraw,
-					&generatedSolution,
-					colors,
-					interval,
-					prevTime,
-					&generationTimeAcc,
-				)
-			}
-
-		case StateDone:
-			{
-			}
+		if state == StateSolving {
+			drawSolver(
+				generatedMaze,
+				solutionToDraw,
+				&generatedSolution,
+				colors,
+				solveDrawInterval,
+				prevTime,
+				&generationTimeAcc,
+			)
 		}
 
 		prevTime = time.Now()

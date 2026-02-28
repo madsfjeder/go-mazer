@@ -7,18 +7,27 @@ import (
 	"slices"
 )
 
+type StackItem[T comparable] struct {
+	item  T
+	index int
+}
+
 type Stack[T comparable] struct {
-	items []T
+	items []StackItem[T]
 }
 
 func New[T comparable]() *Stack[T] {
 	return &Stack[T]{
-		items: make([]T, 0),
+		items: make([]StackItem[T], 0),
 	}
 }
 
-func (s *Stack[T]) Push(e T) {
-	s.items = append(s.items, e)
+func (s *Stack[T]) Push(e T, idx int) {
+	item := StackItem[T]{
+		e,
+		idx,
+	}
+	s.items = append(s.items, item)
 }
 
 func (s *Stack[T]) Pop() (T, error) {
@@ -29,19 +38,24 @@ func (s *Stack[T]) Pop() (T, error) {
 	lastIndex := len(s.items) - 1
 	element := s.items[lastIndex]
 
-	var zero T
+	var zero StackItem[T]
 
 	s.items[lastIndex] = zero
 	s.items = s.items[:lastIndex]
 
-	return element, nil
+	return element.item, nil
 }
 
 func (s *Stack[T]) PopAll() []T {
-	val := s.items
-	s.items = make([]T, 0)
+	list := make([]T, 0)
 
-	return val
+	for _, v := range s.items {
+		list = append(list, v.item)
+	}
+
+	s.items = make([]StackItem[T], 0)
+
+	return list
 }
 
 func (s Stack[T]) Print() {
@@ -51,7 +65,7 @@ func (s Stack[T]) Print() {
 }
 
 func (s Stack[T]) Copy() Stack[T] {
-	itemsSlice := make([]T, len(s.items))
+	itemsSlice := make([]StackItem[T], len(s.items))
 	copy(itemsSlice, s.items)
 
 	return Stack[T]{
@@ -65,7 +79,7 @@ func (s *Stack[T]) Reverse() {
 
 func (s *Stack[T]) FindOrder(v T) int {
 	for i, e := range s.items {
-		if v == e {
+		if v == e.item {
 			return i
 		}
 	}

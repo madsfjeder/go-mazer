@@ -168,8 +168,8 @@ func Generate() (Maze, error) {
 			if err != nil || currentVertex == nil {
 				break
 			}
-			allSteps.Push(currentVertex)
-			backtracking.Push(currentVertex)
+			allSteps.Push(currentVertex, i)
+			backtracking.Push(currentVertex, i)
 			isBacktracking = true
 			continue
 		}
@@ -183,9 +183,9 @@ func Generate() (Maze, error) {
 
 		currentVertex.IsPath = true
 		if !isBacktracking {
-			history.Push(currentVertex)
+			history.Push(currentVertex, i)
 		}
-		allSteps.Push(currentVertex)
+		allSteps.Push(currentVertex, i)
 		currentVertex = nextVertex
 		isBacktracking = false
 	}

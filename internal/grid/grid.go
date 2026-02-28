@@ -22,6 +22,7 @@ type Vertex struct {
 	IsStart          bool
 	IsEnd            bool
 	IsPartOfSolution bool
+	IsBacktracking   bool
 	VisitedBySolver  bool
 	IsSplit          bool
 	TopEdge          *Edge
@@ -186,6 +187,7 @@ func (v *Vertex) hasConnectedVertex(dir string, shouldBePath bool) bool {
 	return connectedVertex != nil
 }
 
+// VisitNextVertex - always goes left first is possible, so it's like depth first search
 func (v *Vertex) VisitNextVertex() *Vertex {
 	options := []string{"left", "bottom", "right", "top"}
 
@@ -256,16 +258,17 @@ func (v *Vertex) Copy() Vertex {
 }
 
 type Colors struct {
-	Start     color.RGBA
-	End       color.RGBA
-	Split     color.RGBA
-	Solution  color.RGBA
-	Wall      color.RGBA
-	EmptyCell color.RGBA
-	Cell      color.RGBA
-	CPU       color.RGBA
-	Text      color.RGBA
-	DebugWall color.RGBA
+	Start        color.RGBA
+	End          color.RGBA
+	Split        color.RGBA
+	Backtracking color.RGBA
+	Solution     color.RGBA
+	Wall         color.RGBA
+	EmptyCell    color.RGBA
+	Cell         color.RGBA
+	CPU          color.RGBA
+	Text         color.RGBA
+	DebugWall    color.RGBA
 }
 
 type CellType int
@@ -277,6 +280,7 @@ const (
 	Path
 	CPU
 	Solution
+	Backtracking
 )
 
 type Config struct {
@@ -365,22 +369,54 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		padding := edgeWidth/4 + 2
 		pathWidth := edgeWidth / 2
 
-		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, r.Colors().Solution)
+		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, cellColor)
 
 		if hasLeftPath {
-			r.DrawRectangle(xPos, yPos+padding, pathWidth, pathWidth, r.Colors().Solution)
+			r.DrawRectangle(xPos, yPos+padding, pathWidth, pathWidth, cellColor)
 		}
 
 		if hasBottomPath {
-			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, pathWidth, pathWidth, r.Colors().Solution)
+			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, pathWidth, pathWidth, cellColor)
 		}
 
 		if hasRightPath {
-			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, pathWidth, pathWidth, r.Colors().Solution)
+			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, pathWidth, pathWidth, cellColor)
 		}
 
 		if hasTopPath {
-			r.DrawRectangle(xPos+padding, yPos, pathWidth, pathWidth, r.Colors().Solution)
+			r.DrawRectangle(xPos+padding, yPos, pathWidth, pathWidth, cellColor)
+		}
+
+		return
+	}
+
+	if cellType == Backtracking {
+		cellColor = r.Colors().Backtracking
+
+		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && v.GetConnectedVertex(v.LeftEdge).IsBacktracking
+		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && v.GetConnectedVertex(v.BottomEdge).IsBacktracking
+		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsBacktracking
+		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsBacktracking
+
+		padding := edgeWidth/4 + 2
+		pathWidth := edgeWidth / 2
+
+		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, cellColor)
+
+		if hasLeftPath {
+			r.DrawRectangle(xPos, yPos+padding, pathWidth, pathWidth, cellColor)
+		}
+
+		if hasBottomPath {
+			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, pathWidth, pathWidth, cellColor)
+		}
+
+		if hasRightPath {
+			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, pathWidth, pathWidth, cellColor)
+		}
+
+		if hasTopPath {
+			r.DrawRectangle(xPos+padding, yPos, pathWidth, pathWidth, cellColor)
 		}
 
 		return
