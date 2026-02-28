@@ -336,6 +336,11 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		edgeColor = r.Colors().DebugWall
 	}
 
+	leftVertex := v.GetConnectedVertex(v.LeftEdge)
+	bottomVertex := v.GetConnectedVertex(v.BottomEdge)
+	rightVertex := v.GetConnectedVertex(v.RightEdge)
+	topVertex := v.GetConnectedVertex(v.TopEdge)
+
 	if cellType == Wall {
 		if v.TopEdge == nil || v.TopEdge.IsWall || !v.GetConnectedVertex(v.TopEdge).IsPath {
 			r.DrawRectangle(xPos, yPos, edgeWidth+wallWidth, wallWidth, edgeColor)
@@ -361,10 +366,10 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	}
 
 	if cellType == Solution {
-		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && v.GetConnectedVertex(v.LeftEdge).IsPartOfSolution
-		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && v.GetConnectedVertex(v.BottomEdge).IsPartOfSolution
-		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsPartOfSolution
-		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsPartOfSolution
+		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && leftVertex != nil && (leftVertex.IsPartOfSolution || leftVertex.IsBacktracking)
+		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && bottomVertex != nil && (bottomVertex.IsPartOfSolution || bottomVertex.IsBacktracking)
+		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && rightVertex != nil && (rightVertex.IsPartOfSolution || rightVertex.IsBacktracking)
+		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && topVertex != nil && (topVertex.IsPartOfSolution || topVertex.IsBacktracking)
 
 		padding := edgeWidth/4 + 2
 		pathWidth := edgeWidth / 2
@@ -393,10 +398,10 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	if cellType == Backtracking {
 		cellColor = r.Colors().Backtracking
 
-		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && v.GetConnectedVertex(v.LeftEdge).IsBacktracking
-		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && v.GetConnectedVertex(v.BottomEdge).IsBacktracking
-		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && v.GetConnectedVertex(v.RightEdge).IsBacktracking
-		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && v.GetConnectedVertex(v.TopEdge).IsBacktracking
+		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && (leftVertex.IsBacktracking || leftVertex.IsPartOfSolution)
+		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && (bottomVertex.IsBacktracking || bottomVertex.IsPartOfSolution)
+		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && (rightVertex.IsBacktracking || rightVertex.IsPartOfSolution)
+		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && (topVertex.IsBacktracking || topVertex.IsPartOfSolution)
 
 		padding := edgeWidth/4 + 2
 		pathWidth := edgeWidth / 2

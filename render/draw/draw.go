@@ -352,7 +352,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		Start:        rl.DarkPurple,
 		End:          rl.Green,
 		Wall:         rl.Black,
-		Backtracking: rl.Magenta,
+		Backtracking: rl.Gray,
 		Split:        rl.Magenta,
 		EmptyCell:    rl.Brown,
 		Cell:         rl.White,
