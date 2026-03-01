@@ -284,11 +284,12 @@ const (
 )
 
 type Config struct {
-	EdgeWidth int32
-	X         int32
-	Y         int32
-	Debug     bool
-	CellType  CellType
+	EdgeWidth        int32
+	X                int32
+	Y                int32
+	Debug            bool
+	CellType         CellType
+	ShowBacktracking bool
 }
 
 type Renderer interface {
@@ -304,6 +305,7 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	cellType := r.Config().CellType
 	edgeWidth := config.EdgeWidth
 	wallWidth := config.WallWidth
+	showBacktracking := r.Config().ShowBacktracking
 	xPos := (r.Config().X * edgeWidth) + edgeWidth/2
 	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight + (edgeWidth / 2)
 
@@ -366,10 +368,10 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	}
 
 	if cellType == Solution {
-		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && leftVertex != nil && (leftVertex.IsPartOfSolution || leftVertex.IsBacktracking)
-		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && bottomVertex != nil && (bottomVertex.IsPartOfSolution || bottomVertex.IsBacktracking)
-		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && rightVertex != nil && (rightVertex.IsPartOfSolution || rightVertex.IsBacktracking)
-		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && topVertex != nil && (topVertex.IsPartOfSolution || topVertex.IsBacktracking)
+		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && leftVertex != nil && (leftVertex.IsPartOfSolution || (leftVertex.IsBacktracking && showBacktracking))
+		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && bottomVertex != nil && (bottomVertex.IsPartOfSolution || (bottomVertex.IsBacktracking && showBacktracking))
+		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && rightVertex != nil && (rightVertex.IsPartOfSolution || (rightVertex.IsBacktracking && showBacktracking))
+		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && topVertex != nil && (topVertex.IsPartOfSolution || (topVertex.IsBacktracking && showBacktracking))
 
 		padding := edgeWidth/4 + 2
 		pathWidth := edgeWidth / 2

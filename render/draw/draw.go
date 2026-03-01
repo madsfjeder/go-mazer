@@ -47,13 +47,14 @@ func (r RaylibRenderer) Config() grid.Config {
 	return r.config
 }
 
-func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors) RaylibRenderer {
+func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors, showBacktracking bool) RaylibRenderer {
 	return RaylibRenderer{
 		config: grid.Config{
-			X:         int32(x),
-			Y:         int32(y),
-			EdgeWidth: config.EdgeWidth,
-			CellType:  cellType,
+			X:                int32(x),
+			Y:                int32(y),
+			EdgeWidth:        config.EdgeWidth,
+			CellType:         cellType,
+			ShowBacktracking: showBacktracking,
 		},
 		colors: colors,
 	}
@@ -132,7 +133,7 @@ func (t *Toggle) Render(xPos, yPos float32) {
 		*t.active,
 	)
 
-	t.active = &active
+	*t.active = active
 }
 
 func drawGui(elements []GuiElement) {
@@ -226,10 +227,10 @@ func drawGeneration(
 					cellType = grid.Split
 				}
 
-				r := NewRaylibRenderer(i, j, cellType, colors)
+				r := NewRaylibRenderer(i, j, cellType, colors, false)
 				e.DrawVertex(r)
 			} else {
-				r := NewRaylibRenderer(i, j, grid.EmptyCell, colors)
+				r := NewRaylibRenderer(i, j, grid.EmptyCell, colors, false)
 				empty := grid.Vertex{
 					IsPath:          false,
 					VisitedBySolver: false,
@@ -246,7 +247,7 @@ func drawGeneration(
 				if e == currentSolverVertex {
 					continue
 				}
-				r := NewRaylibRenderer(i, j, grid.Wall, colors)
+				r := NewRaylibRenderer(i, j, grid.Wall, colors, false)
 				e.DrawVertex(r)
 			}
 		}
@@ -265,6 +266,7 @@ func drawSolver(
 	interval int64,
 	prevTime time.Time,
 	timeAcc *int64,
+	showBacktracking bool,
 ) {
 	// Corresponds to the "CPU" exploring the maze. ie the current position
 	var newestElement *grid.Vertex
@@ -281,7 +283,6 @@ func drawSolver(
 		}
 	} else {
 		s := solution.PopAll()
-
 		drawEveryLoop = append(drawEveryLoop, s...)
 	}
 
@@ -315,16 +316,19 @@ func drawSolver(
 			if e != nil {
 				cellType := grid.Solution
 				if e.IsBacktracking {
+					if !showBacktracking {
+						continue
+					}
 					cellType = grid.Backtracking
 				}
-				r := NewRaylibRenderer(i, j, cellType, colors)
+				r := NewRaylibRenderer(i, j, cellType, colors, showBacktracking)
 				e.DrawVertex(r)
 			}
 		}
 	}
 
 	if newestElement != nil {
-		r := NewRaylibRenderer(newestElementX, newestElementY, grid.CPU, colors)
+		r := NewRaylibRenderer(newestElementX, newestElementY, grid.CPU, colors, showBacktracking)
 		newestElement.DrawVertex(r)
 	}
 }
@@ -411,7 +415,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		textRight: "Faster",
 	}
 
-	showBacktracking := false
+	showBacktracking := true
 
 	toggle := &Toggle{
 		baseElement: baseElement{
@@ -460,6 +464,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 				solveDrawInterval,
 				prevTime,
 				&generationTimeAcc,
+				showBacktracking,
 			)
 		}
 
