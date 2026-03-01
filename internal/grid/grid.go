@@ -306,8 +306,8 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	edgeWidth := config.EdgeWidth
 	wallWidth := config.WallWidth
 	showBacktracking := r.Config().ShowBacktracking
-	xPos := (r.Config().X * edgeWidth) + edgeWidth/2
-	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight + (edgeWidth / 2)
+	xPos := (r.Config().X * edgeWidth)
+	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight
 
 	cellColor := r.Colors().Wall
 	DEBUG := false

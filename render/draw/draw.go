@@ -60,8 +60,14 @@ func NewRaylibRenderer(x, y int, cellType grid.CellType, colors grid.Colors, sho
 	}
 }
 
+type ElementBounds struct {
+	width  int32
+	height int32
+}
+
 type GuiElement interface {
 	Render(xPos, yPos float32)
+	Bounds() ElementBounds
 }
 
 type baseElement struct {
@@ -69,9 +75,16 @@ type baseElement struct {
 	height int32
 }
 
+func (b *baseElement) Bounds() ElementBounds {
+	return ElementBounds{
+		width:  b.width,
+		height: b.height,
+	}
+}
+
 type Button struct {
 	baseElement
-	text    string
+	text    *string
 	onClick func()
 }
 
@@ -82,7 +95,7 @@ func (b *Button) Render(xPos, yPos float32) {
 			yPos,
 			float32(b.width),
 			float32(b.height)),
-		b.text,
+		*b.text,
 	)
 
 	if clicked {
@@ -100,16 +113,17 @@ type Slider struct {
 func (s *Slider) Render(xPos, yPos float32) {
 	interval := gui.Slider(
 		rl.NewRectangle(
-			xPos+30,
+			xPos+50,
 			yPos,
-			float32(s.width),
+			// Account for the labels also taking up space
+			float32(s.width-100),
 			float32(s.height),
 		),
 		s.textLeft,
 		s.textRight,
 		s.value,
 		0,
-		2000,
+		300,
 	)
 
 	s.value = interval
@@ -137,24 +151,27 @@ func (t *Toggle) Render(xPos, yPos float32) {
 }
 
 func drawGui(elements []GuiElement) {
-	xPos := config.EdgeWidth / 2
-	yPos := config.EdgeWidth / 2
+	padding := config.EdgeWidth / 8
+	xPos := padding
+	yPos := config.WallWidth
 
 	rl.DrawRectangle(
 		xPos,
 		yPos,
-		config.MenuBarWidth-(config.EdgeWidth/8),
-		config.MenuBarHeight-(config.EdgeWidth/2),
+		config.MenuBarWidth-padding,
+		config.MenuBarHeight-padding,
 		rl.White,
 	)
 
-	for i, element := range elements {
-		x := xPos + int32(i)*200
-		element.Render(
-			float32(x),
-			float32(yPos+config.EdgeWidth),
-		)
+	xOffset := xPos + padding
+	yOffset := yPos + padding
 
+	for _, element := range elements {
+		element.Render(
+			float32(xOffset),
+			float32(yOffset),
+		)
+		xOffset += element.Bounds().width + padding
 	}
 }
 
@@ -259,6 +276,7 @@ func drawGeneration(
 }
 
 func drawSolver(
+	solvingPlaying bool,
 	completedMaze generate.Maze,
 	matrixToDraw [][]*grid.Vertex,
 	solution *stack.Stack[*grid.Vertex],
@@ -272,18 +290,20 @@ func drawSolver(
 	var newestElement *grid.Vertex
 	drawEveryLoop := make([]*grid.Vertex, 0)
 
-	if interval > 0 {
-		delta := time.Since(prevTime)
-		*timeAcc += delta.Milliseconds()
+	if solvingPlaying {
+		if interval > 0 {
+			delta := time.Since(prevTime)
+			*timeAcc += delta.Milliseconds()
 
-		for *timeAcc >= interval {
-			*timeAcc -= interval
-			e, _ := solution.Pop()
-			drawEveryLoop = append(drawEveryLoop, e)
+			for *timeAcc >= interval {
+				*timeAcc -= interval
+				e, _ := solution.Pop()
+				drawEveryLoop = append(drawEveryLoop, e)
+			}
+		} else {
+			s := solution.PopAll()
+			drawEveryLoop = append(drawEveryLoop, s...)
 		}
-	} else {
-		s := solution.PopAll()
-		drawEveryLoop = append(drawEveryLoop, s...)
 	}
 
 	if len(drawEveryLoop) > 0 {
@@ -380,12 +400,32 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 
 	guiElements := make([]GuiElement, 0)
 
-	btn := &Button{
+	solvingPlaying := true
+	playBtnText := "Pause"
+	playBtn := &Button{
 		baseElement: baseElement{
 			width:  100,
-			height: 40,
+			height: 20,
 		},
-		text: "Reset",
+		text: &playBtnText,
+		onClick: func() {
+			if solvingPlaying {
+				playBtnText = "Play"
+				solvingPlaying = false
+			} else {
+				playBtnText = "Pause"
+				solvingPlaying = true
+			}
+		},
+	}
+
+	resetBtnText := "Reset"
+	resetBtn := &Button{
+		baseElement: baseElement{
+			width:  100,
+			height: 20,
+		},
+		text: &resetBtnText,
 		onClick: func() {
 			newMaze, err := generate.Generate()
 			generatedMaze = newMaze
@@ -407,7 +447,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 
 	slider := &Slider{
 		baseElement: baseElement{
-			width:  100,
+			width:  150,
 			height: 20,
 		},
 		value:     float32(solveDrawInterval),
@@ -426,14 +466,14 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		active: &showBacktracking,
 	}
 
-	guiElements = append(guiElements, btn, slider, toggle)
+	guiElements = append(guiElements, playBtn, resetBtn, slider, toggle)
 
 	prevTime := time.Now()
-	rl.InitWindow(config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, "Mazen")
+	rl.InitWindow(config.Width, config.Height, "Mazen")
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(60)
-	rl.DrawRectangle(0, 0, config.Width+config.EdgeWidth, config.Height+config.EdgeWidth, rl.Black)
+	rl.DrawRectangle(0, 0, config.Width, config.Height, rl.Black)
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 
@@ -457,6 +497,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 
 		if state == StateSolving {
 			drawSolver(
+				solvingPlaying,
 				generatedMaze,
 				solutionToDraw,
 				&generatedSolution,
