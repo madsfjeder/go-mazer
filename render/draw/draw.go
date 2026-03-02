@@ -10,7 +10,6 @@ import (
 	"maze/generate"
 	"maze/internal/grid"
 	"maze/internal/stack"
-	"maze/solver"
 
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -148,6 +147,31 @@ func (t *Toggle) Render(xPos, yPos float32) {
 	)
 
 	*t.active = active
+}
+
+type Dropdown struct {
+	baseElement
+	text     string
+	active   *int32
+	editMode *bool
+}
+
+func (s *Dropdown) Render(xPos, yPos float32) {
+	editMode := gui.DropdownBox(
+		rl.NewRectangle(
+			xPos,
+			yPos,
+			float32(s.width),
+			float32(s.height),
+		),
+		s.text,
+		s.active,
+		*s.editMode,
+	)
+
+	if editMode {
+		*s.editMode = !*s.editMode
+	}
 }
 
 func drawGui(elements []GuiElement) {
@@ -361,7 +385,14 @@ const (
 	StateDone
 )
 
-func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
+func Draw() {
+	solverAlgorithm := generate.DFS
+	maze, err := generate.Generate()
+	if err != nil {
+		panic(err)
+	}
+	solution := maze.Solve(solverAlgorithm)
+
 	generatedMaze := maze
 	generatedSolution := solution
 	generatedSolution.Reverse()
@@ -430,7 +461,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 			newMaze, err := generate.Generate()
 			generatedMaze = newMaze
 			matrixToDraw, steps, currentSolverVertex = setup(newMaze)
-			generatedSolution = solver.Solve(generatedMaze.Matrix)
+			generatedSolution = generatedMaze.Solve(solverAlgorithm)
 			generatedSolution.Reverse()
 			solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
 			for i := range solutionToDraw {
@@ -443,6 +474,18 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 			generationTimeAcc = 0
 			state = StateGeneration
 		},
+	}
+
+	dropdownOpen := false
+	dropdownItemSelected := int32(0)
+	dropDown := &Dropdown{
+		baseElement: baseElement{
+			width:  150,
+			height: 20,
+		},
+		active:   &dropdownItemSelected,
+		text:     "DFS;BFS;GFS;AStar",
+		editMode: &dropdownOpen,
 	}
 
 	slider := &Slider{
@@ -466,7 +509,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 		active: &showBacktracking,
 	}
 
-	guiElements = append(guiElements, playBtn, resetBtn, slider, toggle)
+	guiElements = append(guiElements, playBtn, resetBtn, dropDown, slider, toggle)
 
 	prevTime := time.Now()
 	rl.InitWindow(config.Width, config.Height, "Mazen")
@@ -477,7 +520,6 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 
-		drawGui(guiElements)
 		drawGeneration(
 			generatedMaze,
 			matrixToDraw,
@@ -509,6 +551,7 @@ func Draw(maze generate.Maze, solution stack.Stack[*grid.Vertex]) {
 			)
 		}
 
+		drawGui(guiElements)
 		prevTime = time.Now()
 		rl.EndDrawing()
 	}

@@ -2,7 +2,7 @@
 package generate
 
 import (
-	"errors"
+	"fmt"
 	"math/rand"
 
 	"maze/config"
@@ -16,28 +16,7 @@ type Maze struct {
 	BacktrackSteps stack.Stack[*grid.Vertex]
 }
 
-// For making random decisions
-// Ex. if you want a 10% chance of returning true - rollArbitraryDice(n = 10)
-func rollArbitraryDice(n int) bool {
-	num := rand.Intn(n)
-
-	return num == n-1
-}
-
-func getDistanceFromStart(currentVertex *grid.Vertex, matrix [][]*grid.Vertex) int {
-	for i := range matrix {
-		for j := range matrix[i] {
-			elem := matrix[i][j]
-			if elem == currentVertex {
-				return i + j
-			}
-		}
-	}
-
-	return 0
-}
-
-func Generate() (Maze, error) {
+func (m *Maze) setupEmpty() {
 	matrix := make([][]*grid.Vertex, config.VerticesPerRow)
 
 	for i := range matrix {
@@ -125,11 +104,15 @@ func Generate() (Maze, error) {
 		}
 	}
 
+	m.Matrix = matrix
+}
+
+func (m *Maze) generate() {
 	history := stack.New[*grid.Vertex]()
 	allSteps := stack.New[*grid.Vertex]()
 	backtracking := stack.New[*grid.Vertex]()
 
-	currentVertex := matrix[0][0]
+	currentVertex := m.Matrix[0][0]
 	currentVertex.IsStart = true
 	currentVertex.IsPath = true
 
@@ -174,7 +157,7 @@ func Generate() (Maze, error) {
 			continue
 		}
 
-		cartesianDistanceFromStart = getDistanceFromStart(currentVertex, matrix)
+		cartesianDistanceFromStart = getDistanceFromStart(currentVertex, m.Matrix)
 
 		if !endGoalPlaced && int32(cartesianDistanceFromStart) > (config.VerticesPerCol+config.VerticesPerRow-5) {
 			currentVertex.IsEnd = true
@@ -191,12 +174,106 @@ func Generate() (Maze, error) {
 	}
 
 	if mazeIncomplete {
-		return Maze{}, errors.New("cannot generate maze")
+		panic("cannot generate maze")
 	}
 
-	return Maze{
-		Matrix:         matrix,
-		Steps:          *allSteps,
-		BacktrackSteps: *backtracking,
-	}, nil
+	m.Steps = *allSteps
+	m.BacktrackSteps = *backtracking
+}
+
+type SolverAlgorithm int
+
+const (
+	DFS SolverAlgorithm = iota
+	BFS
+	GFS
+	AStar
+)
+
+func (m Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
+	history := *stack.New[*grid.Vertex]()
+	allSteps := *stack.New[*grid.Vertex]()
+
+	currentVertex := m.Matrix[0][0]
+	currentVertex.VisitedBySolver = true
+	previousVertex := currentVertex
+	previousVertex.IsPartOfSolution = true
+	isBacktracking := false
+	var backtrackingRootVertex *grid.Vertex
+
+	for i := 0; i < 10000; i++ {
+		allSteps.Push(currentVertex, i)
+		if currentVertex.IsEnd {
+			history.Push(currentVertex, i)
+			break
+		}
+
+		nextVertex := currentVertex.VisitNextVertex()
+
+		if nextVertex == nil {
+			v, err := history.Pop()
+			if err != nil {
+				fmt.Println("No more history!")
+				break
+			}
+			previousVertex = currentVertex
+			previousVertex.IsPartOfSolution = false
+			previousVertex.IsBacktracking = true
+			currentVertex = v
+			backtrackingRootVertex = v
+			isBacktracking = true
+			continue
+		}
+
+		if isBacktracking && backtrackingRootVertex != nil {
+			var zero *grid.Vertex
+			history.Push(backtrackingRootVertex, i)
+			backtrackingRootVertex = zero
+		}
+
+		if !isBacktracking {
+			history.Push(currentVertex, i)
+		}
+
+		currentVertex = nextVertex
+		isBacktracking = false
+		currentVertex.VisitedBySolver = true
+		currentVertex.IsPartOfSolution = true
+	}
+
+	return allSteps
+}
+
+func getMaze() *Maze {
+	m := &Maze{}
+
+	m.setupEmpty()
+	m.generate()
+	return m
+}
+
+// For making random decisions
+// Ex. if you want a 10% chance of returning true - rollArbitraryDice(n = 10)
+func rollArbitraryDice(n int) bool {
+	num := rand.Intn(n)
+
+	return num == n-1
+}
+
+func getDistanceFromStart(currentVertex *grid.Vertex, matrix [][]*grid.Vertex) int {
+	for i := range matrix {
+		for j := range matrix[i] {
+			elem := matrix[i][j]
+			if elem == currentVertex {
+				return i + j
+			}
+		}
+	}
+
+	return 0
+}
+
+func Generate() (Maze, error) {
+	matrix := getMaze()
+	return *matrix, nil
 }
