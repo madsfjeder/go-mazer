@@ -152,7 +152,7 @@ func (t *Toggle) Render(xPos, yPos float32) {
 type Dropdown struct {
 	baseElement
 	text     string
-	active   *int32
+	active   *generate.SolverAlgorithm
 	editMode *bool
 }
 
@@ -477,13 +477,12 @@ func Draw() {
 	}
 
 	dropdownOpen := false
-	dropdownItemSelected := int32(0)
 	dropDown := &Dropdown{
 		baseElement: baseElement{
 			width:  150,
 			height: 20,
 		},
-		active:   &dropdownItemSelected,
+		active:   &solverAlgorithm,
 		text:     "DFS;BFS;GFS;AStar",
 		editMode: &dropdownOpen,
 	}

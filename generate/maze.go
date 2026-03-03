@@ -14,6 +14,7 @@ type Maze struct {
 	Matrix         [][]*grid.Vertex
 	Steps          stack.Stack[*grid.Vertex]
 	BacktrackSteps stack.Stack[*grid.Vertex]
+	solverData     *solverData
 }
 
 func (m *Maze) setupEmpty() {
@@ -181,18 +182,16 @@ func (m *Maze) generate() {
 	m.BacktrackSteps = *backtracking
 }
 
-type SolverAlgorithm int
+type solverData struct {
+	steps                  stack.Stack[*grid.Vertex]
+	currentVertex          *grid.Vertex
+	previousVertex         *grid.Vertex
+	isBacktracking         *bool
+	backtrackingRootVertex *grid.Vertex
+}
 
-const (
-	DFS SolverAlgorithm = iota
-	BFS
-	GFS
-	AStar
-)
-
-func (m Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
-	history := *stack.New[*grid.Vertex]()
-	allSteps := *stack.New[*grid.Vertex]()
+func (m *Maze) prepareSolver() {
+	steps := *stack.New[*grid.Vertex]()
 
 	currentVertex := m.Matrix[0][0]
 	currentVertex.VisitedBySolver = true
@@ -201,14 +200,29 @@ func (m Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
 	isBacktracking := false
 	var backtrackingRootVertex *grid.Vertex
 
+	data := solverData{
+		steps,
+		currentVertex,
+		previousVertex,
+		&isBacktracking,
+		backtrackingRootVertex,
+	}
+
+	m.solverData = &data
+}
+
+func (m *Maze) solveDFS() {
+	m.prepareSolver()
+	history := *stack.New[*grid.Vertex]()
+
 	for i := 0; i < 10000; i++ {
-		allSteps.Push(currentVertex, i)
-		if currentVertex.IsEnd {
-			history.Push(currentVertex, i)
+		m.solverData.steps.Push(m.solverData.currentVertex, i)
+		if m.solverData.currentVertex.IsEnd {
+			history.Push(m.solverData.currentVertex, i)
 			break
 		}
 
-		nextVertex := currentVertex.VisitNextVertex()
+		nextVertex := m.solverData.currentVertex.VisitNextVertex()
 
 		if nextVertex == nil {
 			v, err := history.Pop()
@@ -216,32 +230,65 @@ func (m Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
 				fmt.Println("No more history!")
 				break
 			}
-			previousVertex = currentVertex
+			previousVertex := m.solverData.currentVertex
 			previousVertex.IsPartOfSolution = false
 			previousVertex.IsBacktracking = true
-			currentVertex = v
-			backtrackingRootVertex = v
-			isBacktracking = true
+			m.solverData.currentVertex = v
+			m.solverData.backtrackingRootVertex = v
+			*m.solverData.isBacktracking = true
 			continue
 		}
 
-		if isBacktracking && backtrackingRootVertex != nil {
+		if *m.solverData.isBacktracking && m.solverData.backtrackingRootVertex != nil {
 			var zero *grid.Vertex
-			history.Push(backtrackingRootVertex, i)
-			backtrackingRootVertex = zero
+			history.Push(m.solverData.backtrackingRootVertex, i)
+			m.solverData.backtrackingRootVertex = zero
 		}
 
-		if !isBacktracking {
-			history.Push(currentVertex, i)
+		if !*m.solverData.isBacktracking {
+			history.Push(m.solverData.currentVertex, i)
 		}
 
-		currentVertex = nextVertex
-		isBacktracking = false
-		currentVertex.VisitedBySolver = true
-		currentVertex.IsPartOfSolution = true
+		m.solverData.currentVertex = nextVertex
+		*m.solverData.isBacktracking = false
+		m.solverData.currentVertex.VisitedBySolver = true
+		m.solverData.currentVertex.IsPartOfSolution = true
+	}
+}
+
+func (m *Maze) solveBFS() {
+	m.prepareSolver()
+
+	for i := 0; i < 10000; i++ {
+	}
+}
+
+type SolverAlgorithm = int32
+
+const (
+	DFS SolverAlgorithm = iota
+	BFS
+	GFS
+	AStar
+)
+
+func (m *Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
+	switch algo {
+	default:
+	case DFS:
+		{
+			m.solveDFS()
+			return m.solverData.steps
+		}
+	case BFS:
+		{
+			m.solveBFS()
+			return m.solverData.steps
+		}
 	}
 
-	return allSteps
+	emptySteps := stack.New[*grid.Vertex]()
+	return *emptySteps
 }
 
 func getMaze() *Maze {
