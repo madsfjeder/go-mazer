@@ -108,9 +108,45 @@ func (m *Maze) setupEmpty() {
 	m.Matrix = matrix
 }
 
+func (m *Maze) generateEmptyTest() {
+	steps := stack.New[*grid.Vertex]()
+	currentVertex := m.Matrix[0][0]
+	currentVertex.IsStart = true
+
+	idx := 0
+	for i := range m.Matrix {
+		for j := range m.Matrix[i] {
+			currentVertex := m.Matrix[i][j]
+			steps.Push(currentVertex, idx)
+			currentVertex.IsPath = true
+
+			if currentVertex.LeftEdge != nil {
+				currentVertex.LeftEdge.IsWall = false
+			}
+
+			if currentVertex.BottomEdge != nil {
+				currentVertex.BottomEdge.IsWall = false
+			}
+
+			if currentVertex.RightEdge != nil {
+				currentVertex.RightEdge.IsWall = false
+			}
+
+			if currentVertex.TopEdge != nil {
+				currentVertex.TopEdge.IsWall = false
+			}
+			idx += 1
+		}
+	}
+
+	lastVertex := m.Matrix[config.VerticesPerRow-1][config.VerticesPerCol-1]
+	lastVertex.IsEnd = true
+	m.Steps = *steps
+}
+
 func (m *Maze) generateRandomDFS() {
 	history := stack.New[*grid.Vertex]()
-	allSteps := stack.New[*grid.Vertex]()
+	steps := stack.New[*grid.Vertex]()
 	backtracking := stack.New[*grid.Vertex]()
 
 	currentVertex := m.Matrix[0][0]
@@ -152,7 +188,7 @@ func (m *Maze) generateRandomDFS() {
 			if err != nil || currentVertex == nil {
 				break
 			}
-			allSteps.Push(currentVertex, i)
+			steps.Push(currentVertex, i)
 			backtracking.Push(currentVertex, i)
 			isBacktracking = true
 			continue
@@ -169,7 +205,7 @@ func (m *Maze) generateRandomDFS() {
 		if !isBacktracking {
 			history.Push(currentVertex, i)
 		}
-		allSteps.Push(currentVertex, i)
+		steps.Push(currentVertex, i)
 		currentVertex = nextVertex
 		isBacktracking = false
 	}
@@ -178,7 +214,7 @@ func (m *Maze) generateRandomDFS() {
 		panic("cannot generate maze")
 	}
 
-	m.Steps = *allSteps
+	m.Steps = *steps
 	m.BacktrackSteps = *backtracking
 }
 
@@ -186,6 +222,7 @@ func (m *Maze) generate(selectedLevel SelectedLevel) {
 	switch selectedLevel {
 	case EmptyTest:
 		{
+			m.generateEmptyTest()
 		}
 
 	case RandomMaze:

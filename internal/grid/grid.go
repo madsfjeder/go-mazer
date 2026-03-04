@@ -217,9 +217,10 @@ func (v *Vertex) VisitNextVertex() *Vertex {
 
 		t := v.GetConnectedVertex(e)
 
-		if !t.VisitedBySolver {
+		if t != nil && !t.VisitedBySolver {
 			e.VisitedBySolver = true
 			nextVertex = t
+			break
 		}
 	}
 
