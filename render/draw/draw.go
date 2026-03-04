@@ -151,9 +151,11 @@ func (t *Toggle) Render(xPos, yPos float32) {
 
 type Dropdown struct {
 	baseElement
-	text     string
-	active   *generate.SolverAlgorithm
-	editMode *bool
+	text           string
+	active         *int32
+	previousActive int32
+	editMode       *bool
+	onChange       func()
 }
 
 func (s *Dropdown) Render(xPos, yPos float32) {
@@ -171,6 +173,11 @@ func (s *Dropdown) Render(xPos, yPos float32) {
 
 	if editMode {
 		*s.editMode = !*s.editMode
+	}
+
+	if *s.active != s.previousActive {
+		s.previousActive = *s.active
+		s.onChange()
 	}
 }
 
@@ -387,7 +394,9 @@ const (
 
 func Draw() {
 	solverAlgorithm := generate.DFS
-	maze, err := generate.Generate()
+	selectedLevel := generate.RandomMaze
+
+	maze, err := generate.Generate(selectedLevel)
 	if err != nil {
 		panic(err)
 	}
@@ -450,41 +459,57 @@ func Draw() {
 		},
 	}
 
+	reset := func() {
+		newMaze, err := generate.Generate(selectedLevel)
+		generatedMaze = newMaze
+		matrixToDraw, steps, currentSolverVertex = setup(newMaze)
+		generatedSolution = generatedMaze.Solve(solverAlgorithm)
+		generatedSolution.Reverse()
+		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
+		for i := range solutionToDraw {
+			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
+		}
+
+		if err != nil {
+			panic(0)
+		}
+		generationTimeAcc = 0
+		state = StateGeneration
+	}
+
 	resetBtnText := "Reset"
 	resetBtn := &Button{
 		baseElement: baseElement{
 			width:  100,
 			height: 20,
 		},
-		text: &resetBtnText,
-		onClick: func() {
-			newMaze, err := generate.Generate()
-			generatedMaze = newMaze
-			matrixToDraw, steps, currentSolverVertex = setup(newMaze)
-			generatedSolution = generatedMaze.Solve(solverAlgorithm)
-			generatedSolution.Reverse()
-			solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
-			for i := range solutionToDraw {
-				solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
-			}
-
-			if err != nil {
-				panic(0)
-			}
-			generationTimeAcc = 0
-			state = StateGeneration
-		},
+		text:    &resetBtnText,
+		onClick: reset,
 	}
 
-	dropdownOpen := false
-	dropDown := &Dropdown{
+	algoDropdownOpen := false
+	algoDropdown := &Dropdown{
+		baseElement: baseElement{
+			width:  100,
+			height: 20,
+		},
+		active:         &solverAlgorithm,
+		previousActive: solverAlgorithm,
+		text:           "DFS;BFS;GFS;AStar",
+		editMode:       &algoDropdownOpen,
+	}
+
+	levelSelectDropdownOpen := false
+	levelSelectDropdown := &Dropdown{
 		baseElement: baseElement{
 			width:  150,
 			height: 20,
 		},
-		active:   &solverAlgorithm,
-		text:     "DFS;BFS;GFS;AStar",
-		editMode: &dropdownOpen,
+		active:         &selectedLevel,
+		previousActive: selectedLevel,
+		text:           "Random maze;Empty test",
+		editMode:       &levelSelectDropdownOpen,
+		onChange:       reset,
 	}
 
 	slider := &Slider{
@@ -508,7 +533,7 @@ func Draw() {
 		active: &showBacktracking,
 	}
 
-	guiElements = append(guiElements, playBtn, resetBtn, dropDown, slider, toggle)
+	guiElements = append(guiElements, playBtn, resetBtn, levelSelectDropdown, algoDropdown, slider, toggle)
 
 	prevTime := time.Now()
 	rl.InitWindow(config.Width, config.Height, "Mazen")

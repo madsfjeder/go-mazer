@@ -108,7 +108,7 @@ func (m *Maze) setupEmpty() {
 	m.Matrix = matrix
 }
 
-func (m *Maze) generate() {
+func (m *Maze) generateRandomDFS() {
 	history := stack.New[*grid.Vertex]()
 	allSteps := stack.New[*grid.Vertex]()
 	backtracking := stack.New[*grid.Vertex]()
@@ -180,6 +180,19 @@ func (m *Maze) generate() {
 
 	m.Steps = *allSteps
 	m.BacktrackSteps = *backtracking
+}
+
+func (m *Maze) generate(selectedLevel SelectedLevel) {
+	switch selectedLevel {
+	case EmptyTest:
+		{
+		}
+
+	case RandomMaze:
+		{
+			m.generateRandomDFS()
+		}
+	}
 }
 
 type solverData struct {
@@ -272,6 +285,13 @@ const (
 	AStar
 )
 
+type SelectedLevel = int32
+
+const (
+	RandomMaze SelectedLevel = iota
+	EmptyTest
+)
+
 func (m *Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
 	switch algo {
 	default:
@@ -291,11 +311,11 @@ func (m *Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
 	return *emptySteps
 }
 
-func getMaze() *Maze {
+func getMaze(selectedLevel SelectedLevel) *Maze {
 	m := &Maze{}
 
 	m.setupEmpty()
-	m.generate()
+	m.generate(selectedLevel)
 	return m
 }
 
@@ -320,7 +340,7 @@ func getDistanceFromStart(currentVertex *grid.Vertex, matrix [][]*grid.Vertex) i
 	return 0
 }
 
-func Generate() (Maze, error) {
-	matrix := getMaze()
+func Generate(selectedLevel SelectedLevel) (Maze, error) {
+	matrix := getMaze(selectedLevel)
 	return *matrix, nil
 }

@@ -15,3 +15,12 @@ func New[T comparable]() *Queue[T] {
 		items: make([]QueueItem[T], 0),
 	}
 }
+
+func (q *Queue[T]) Push(e T, idx int) {
+	item := QueueItem[T]{
+		item:  e,
+		index: idx,
+	}
+
+	q.items = append(q.items, item)
+}
