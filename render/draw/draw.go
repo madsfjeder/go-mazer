@@ -26,6 +26,22 @@ func (r RaylibRenderer) DrawRectangle(x, y, width, height int32, color color.RGB
 	rl.DrawRectangle(x, y, width, height, color)
 }
 
+func (r RaylibRenderer) DrawTile(x, y, width, height int32, color color.RGBA) {
+	r.DrawRectangle(x, y, width, height, color)
+
+	// Top
+	r.DrawRectangle(x, y, width, 1, rl.NewColor(230, 230, 230, 200))
+
+	// Left
+	r.DrawRectangle(x, y, 1, height, rl.NewColor(230, 230, 230, 200))
+
+	// Bottom
+	r.DrawRectangle(x, y+height-1, width, 1, rl.NewColor(0, 0, 0, 125))
+
+	// Right
+	r.DrawRectangle(x+width-1, y, 1, height, rl.NewColor(0, 0, 0, 125))
+}
+
 func (r RaylibRenderer) DrawRectangleRounded(x, y, width, height int32, roundness float32, color color.RGBA) {
 	rl.DrawRectangleRounded(rl.NewRectangle(float32(x), float32(y), float32(width), float32(height)), roundness, 4, color)
 }
@@ -182,14 +198,14 @@ func (s *Dropdown) Render(xPos, yPos float32) {
 }
 
 func drawGui(elements []GuiElement) {
-	padding := config.EdgeWidth / 8
+	padding := config.Padding
 	xPos := padding
-	yPos := config.WallWidth
+	yPos := padding
 
 	rl.DrawRectangle(
 		xPos,
 		yPos,
-		config.MenuBarWidth-padding,
+		config.MenuBarWidth,
 		config.MenuBarHeight-padding,
 		rl.White,
 	)
@@ -288,21 +304,23 @@ func drawGeneration(
 		}
 	}
 
+	if steps.Length() == 0 {
+		onComplete()
+	}
+}
+
+func drawWalls(
+	matrixToDraw [][]*grid.Vertex,
+	colors grid.Colors,
+) {
 	for i := range matrixToDraw {
 		for j := range matrixToDraw[i] {
 			e := matrixToDraw[i][j]
 			if e != nil {
-				if e == currentSolverVertex {
-					continue
-				}
 				r := NewRaylibRenderer(i, j, grid.Wall, colors, false)
 				e.DrawVertex(r)
 			}
 		}
-	}
-
-	if steps.Length() == 0 {
-		onComplete()
 	}
 }
 
@@ -415,12 +433,12 @@ func Draw() {
 	colors := grid.Colors{
 		Start:        rl.DarkPurple,
 		End:          rl.Green,
-		Wall:         rl.Black,
+		Wall:         rl.NewColor(30, 30, 30, 255),
 		Backtracking: rl.Gray,
 		Split:        rl.Magenta,
 		EmptyCell:    rl.Brown,
-		Cell:         rl.White,
-		Solution:     rl.Red,
+		Cell:         rl.LightGray,
+		Solution:     rl.NewColor(240, 125, 151, 255),
 		Text:         rl.Red,
 		CPU:          rl.Blue,
 		DebugWall:    rl.Beige,
@@ -497,6 +515,7 @@ func Draw() {
 		previousActive: solverAlgorithm,
 		text:           "DFS;BFS;GFS;AStar",
 		editMode:       &algoDropdownOpen,
+		onChange:       reset,
 	}
 
 	levelSelectDropdownOpen := false
@@ -574,6 +593,11 @@ func Draw() {
 				showBacktracking,
 			)
 		}
+
+		drawWalls(
+			matrixToDraw,
+			colors,
+		)
 
 		drawGui(guiElements)
 		prevTime = time.Now()

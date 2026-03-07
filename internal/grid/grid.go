@@ -7,6 +7,8 @@ import (
 	"math/rand"
 
 	"maze/config"
+
+	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
 type Edge struct {
@@ -187,6 +189,44 @@ func (v *Vertex) hasConnectedVertex(dir string, shouldBePath bool) bool {
 	return connectedVertex != nil
 }
 
+func (v *Vertex) GetNeighbours() []*Vertex {
+	neighbours := make([]*Vertex, 0)
+	hasLeft := v.hasConnectedVertex("left", true)
+	hasBottom := v.hasConnectedVertex("bottom", true)
+	hasRight := v.hasConnectedVertex("right", true)
+	hasTop := v.hasConnectedVertex("top", true)
+
+	if hasTop {
+		top := v.GetConnectedVertex(v.TopEdge)
+		if !top.VisitedBySolver {
+			neighbours = append(neighbours, top)
+		}
+	}
+
+	if hasRight {
+		right := v.GetConnectedVertex(v.RightEdge)
+		if !right.VisitedBySolver {
+			neighbours = append(neighbours, right)
+		}
+	}
+
+	if hasBottom {
+		bottom := v.GetConnectedVertex(v.BottomEdge)
+		if !bottom.VisitedBySolver {
+			neighbours = append(neighbours, bottom)
+		}
+	}
+
+	if hasLeft {
+		left := v.GetConnectedVertex(v.LeftEdge)
+		if !left.VisitedBySolver {
+			neighbours = append(neighbours, left)
+		}
+	}
+
+	return neighbours
+}
+
 // VisitNextVertex - always goes left first is possible, so it's like depth first search
 func (v *Vertex) VisitNextVertex() *Vertex {
 	options := []string{"left", "bottom", "right", "top"}
@@ -296,6 +336,7 @@ type Config struct {
 type Renderer interface {
 	DrawRectangle(xPos, yPos, width, height int32, color color.RGBA)
 	DrawRectangleRounded(xPos, yPos, width, height int32, roundness float32, color color.RGBA)
+	DrawTile(xPos, yPos, width, height int32, color color.RGBA)
 	DrawText(text string, xPos, yPos, fontSize int32, color color.RGBA)
 	DrawCircle(x, y int32, radius float32, color color.RGBA)
 	Config() Config
@@ -307,8 +348,8 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	edgeWidth := config.EdgeWidth
 	wallWidth := config.WallWidth
 	showBacktracking := r.Config().ShowBacktracking
-	xPos := (r.Config().X * edgeWidth)
-	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight
+	xPos := (r.Config().X * edgeWidth) + config.Padding
+	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight + config.Padding
 
 	cellColor := r.Colors().Wall
 	DEBUG := false
@@ -339,26 +380,27 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		edgeColor = r.Colors().DebugWall
 	}
 
-	leftVertex := v.GetConnectedVertex(v.LeftEdge)
-	bottomVertex := v.GetConnectedVertex(v.BottomEdge)
-	rightVertex := v.GetConnectedVertex(v.RightEdge)
-	topVertex := v.GetConnectedVertex(v.TopEdge)
-
 	if cellType == Wall {
-		if v.TopEdge == nil || v.TopEdge.IsWall || !v.GetConnectedVertex(v.TopEdge).IsPath {
-			r.DrawRectangle(xPos, yPos, edgeWidth+wallWidth, wallWidth, edgeColor)
+		shadowColor := rl.NewColor(0, 0, 0, 90)
+		if v.TopEdge != nil && (v.TopEdge.IsWall && !v.GetConnectedVertex(v.TopEdge).IsPath) {
+			r.DrawRectangle(xPos, yPos-(wallWidth/2), edgeWidth, wallWidth-config.Padding, edgeColor)
+			r.DrawRectangle(xPos+1, yPos+1, edgeWidth, 2, shadowColor)
 		}
 
-		if v.RightEdge == nil || v.RightEdge.IsWall || !v.GetConnectedVertex(v.RightEdge).IsPath {
-			r.DrawRectangle(xPos+edgeWidth, yPos, wallWidth, edgeWidth+wallWidth, edgeColor)
+		if v.RightEdge != nil && (v.RightEdge.IsWall || !v.GetConnectedVertex(v.RightEdge).IsPath) {
+			r.DrawRectangle(xPos+edgeWidth-(wallWidth/2), yPos, wallWidth-config.Padding, edgeWidth, edgeColor)
+
+			r.DrawRectangle(xPos+edgeWidth+1, yPos+1, 2, edgeWidth, shadowColor)
 		}
 
-		if v.BottomEdge == nil || v.BottomEdge.IsWall || !v.GetConnectedVertex(v.BottomEdge).IsPath {
-			r.DrawRectangle(xPos, yPos+edgeWidth, edgeWidth+wallWidth, wallWidth, edgeColor)
+		if v.BottomEdge != nil && (v.BottomEdge.IsWall || !v.GetConnectedVertex(v.BottomEdge).IsPath) {
+			r.DrawRectangle(xPos, yPos+edgeWidth-(wallWidth/2), edgeWidth, wallWidth-config.Padding, edgeColor)
+			r.DrawRectangle(xPos+1, yPos+edgeWidth+1, edgeWidth, 2, shadowColor)
 		}
 
-		if v.LeftEdge == nil || v.LeftEdge.IsWall || !v.GetConnectedVertex(v.LeftEdge).IsPath {
-			r.DrawRectangle(xPos, yPos, wallWidth, edgeWidth+wallWidth, edgeColor)
+		if v.LeftEdge != nil && (v.LeftEdge.IsWall || !v.GetConnectedVertex(v.LeftEdge).IsPath) {
+			r.DrawRectangle(xPos-(wallWidth/2), yPos, wallWidth-config.Padding, edgeWidth, edgeColor)
+			r.DrawRectangle(xPos+1, yPos+1, 2, edgeWidth, shadowColor)
 		}
 		return
 	}
@@ -369,64 +411,12 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	}
 
 	if cellType == Solution {
-		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && leftVertex != nil && (leftVertex.IsPartOfSolution || (leftVertex.IsBacktracking && showBacktracking))
-		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && bottomVertex != nil && (bottomVertex.IsPartOfSolution || (bottomVertex.IsBacktracking && showBacktracking))
-		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && rightVertex != nil && (rightVertex.IsPartOfSolution || (rightVertex.IsBacktracking && showBacktracking))
-		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && topVertex != nil && (topVertex.IsPartOfSolution || (topVertex.IsBacktracking && showBacktracking))
-
-		padding := edgeWidth/4 + 2
-		pathWidth := edgeWidth / 2
-
-		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, cellColor)
-
-		if hasLeftPath {
-			r.DrawRectangle(xPos, yPos+padding, pathWidth, pathWidth, cellColor)
-		}
-
-		if hasBottomPath {
-			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, pathWidth, pathWidth, cellColor)
-		}
-
-		if hasRightPath {
-			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, pathWidth, pathWidth, cellColor)
-		}
-
-		if hasTopPath {
-			r.DrawRectangle(xPos+padding, yPos, pathWidth, pathWidth, cellColor)
-		}
-
-		return
+		r.DrawTile(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 	}
 
-	if cellType == Backtracking {
+	if cellType == Backtracking && showBacktracking {
 		cellColor = r.Colors().Backtracking
-
-		hasLeftPath := v.LeftEdge != nil && !v.LeftEdge.IsWall && (leftVertex.IsBacktracking || leftVertex.IsPartOfSolution)
-		hasBottomPath := v.BottomEdge != nil && !v.BottomEdge.IsWall && (bottomVertex.IsBacktracking || bottomVertex.IsPartOfSolution)
-		hasRightPath := v.RightEdge != nil && !v.RightEdge.IsWall && (rightVertex.IsBacktracking || rightVertex.IsPartOfSolution)
-		hasTopPath := v.TopEdge != nil && !v.TopEdge.IsWall && (topVertex.IsBacktracking || topVertex.IsPartOfSolution)
-
-		padding := edgeWidth/4 + 2
-		pathWidth := edgeWidth / 2
-
-		r.DrawRectangleRounded(xPos+padding, yPos+padding, pathWidth, pathWidth, 50, cellColor)
-
-		if hasLeftPath {
-			r.DrawRectangle(xPos, yPos+padding, pathWidth, pathWidth, cellColor)
-		}
-
-		if hasBottomPath {
-			r.DrawRectangle(xPos+padding, yPos+edgeWidth/2, pathWidth, pathWidth, cellColor)
-		}
-
-		if hasRightPath {
-			r.DrawRectangle(xPos+edgeWidth/2, yPos+padding, pathWidth, pathWidth, cellColor)
-		}
-
-		if hasTopPath {
-			r.DrawRectangle(xPos+padding, yPos, pathWidth, pathWidth, cellColor)
-		}
-
+		r.DrawTile(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 		return
 	}
 
@@ -434,17 +424,18 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
 		return
 	}
-
-	if v.IsPath && cellType != Solution {
-		r.DrawRectangle(xPos, yPos, edgeWidth, edgeWidth, cellColor)
-	}
-
 	if v.IsStart {
-		r.DrawCircle(xPos+(edgeWidth/2)+(wallWidth/2), yPos+(edgeWidth/2)+(wallWidth/2), float32(edgeWidth/2)-float32(wallWidth/2), r.Colors().Start)
+		r.DrawTile(xPos, yPos, edgeWidth, edgeWidth, r.Colors().Start)
+		return
 	}
 
 	if v.IsEnd {
-		r.DrawCircle(xPos+(edgeWidth/2)+(wallWidth/2), yPos+(edgeWidth/2)+(wallWidth/2), float32(edgeWidth/2)-float32(wallWidth/2), r.Colors().End)
+		r.DrawTile(xPos, yPos, edgeWidth, edgeWidth, r.Colors().End)
+		return
+	}
+
+	if v.IsPath && cellType != Solution {
+		r.DrawTile(xPos, yPos, edgeWidth, edgeWidth, r.Colors().Cell)
 	}
 }
 
