@@ -90,3 +90,13 @@ func (s *Stack[T]) FindOrder(v T) int {
 func (s *Stack[T]) Length() int {
 	return len(s.items)
 }
+
+func (s *Stack[T]) Items() []T {
+	items := make([]T, 0)
+
+	for _, v := range s.items {
+		items = append(items, v.item)
+	}
+
+	return items
+}

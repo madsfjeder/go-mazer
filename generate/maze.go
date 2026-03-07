@@ -232,6 +232,17 @@ func (m *Maze) generate(selectedLevel SelectedLevel) {
 	}
 }
 
+func (m *Maze) resetSolution() {
+	for i := range m.Matrix {
+		for j := range m.Matrix[i] {
+			vertex := m.Matrix[i][j]
+			vertex.VisitedBySolver = false
+			vertex.IsBacktracking = false
+			vertex.IsPartOfSolution = false
+		}
+	}
+}
+
 func (m *Maze) solveDFS() stack.Stack[*grid.Vertex] {
 	steps := *stack.New[*grid.Vertex]()
 
@@ -290,6 +301,7 @@ func (m *Maze) solveDFS() stack.Stack[*grid.Vertex] {
 func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 	steps := *stack.New[*grid.Vertex]()
 	startVertex := m.Matrix[0][0]
+	startVertex.IsPartOfSolution = true
 
 	history := *stack.New[*grid.Vertex]()
 	q := *queue.New[*grid.Vertex]()
@@ -309,13 +321,13 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 		currentVertex = nextVertex
 		currentVertex.VisitedBySolver = true
 		steps.Push(currentVertex, count)
+		history.Push(currentVertex, count)
 
 		if currentVertex.IsEnd {
 			break
 		}
 
 		currentVertex.IsBacktracking = true
-		history.Push(currentVertex, count)
 		neighbours := currentVertex.GetNeighbours()
 
 		for _, v := range neighbours {
@@ -330,10 +342,12 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 	}
 
 	previousVertex := parentMap[currentVertex]
+	currentVertex.IsPartOfSolution = true
 
 	stepBackCount := 0
 	for previousVertex != nil {
 		previousVertex.IsBacktracking = false
+		previousVertex.IsPartOfSolution = true
 		previousVertex = parentMap[previousVertex]
 		stepBackCount++
 	}
@@ -358,6 +372,7 @@ const (
 )
 
 func (m *Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
+	m.resetSolution()
 	switch algo {
 	default:
 	case DFS:

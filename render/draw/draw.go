@@ -4,6 +4,7 @@ package render
 import (
 	"flag"
 	"image/color"
+	"strconv"
 	"time"
 
 	"maze/config"
@@ -197,7 +198,12 @@ func (s *Dropdown) Render(xPos, yPos float32) {
 	}
 }
 
-func drawGui(elements []GuiElement) {
+type Stats struct {
+	totalSteps    int
+	solutionSteps int
+}
+
+func drawGui(elements []GuiElement, stats Stats) {
 	padding := config.Padding
 	xPos := padding
 	yPos := padding
@@ -220,6 +226,12 @@ func drawGui(elements []GuiElement) {
 		)
 		xOffset += element.Bounds().width + padding
 	}
+
+	totalStepsText := "Total steps: " + strconv.Itoa(stats.totalSteps)
+	solutionStepsText := "Solution steps: " + strconv.Itoa(stats.solutionSteps)
+
+	rl.DrawText(totalStepsText, 0, 25, 14, rl.Black)
+	rl.DrawText(solutionStepsText, 200, 25, 14, rl.Black)
 }
 
 func setup(
@@ -423,6 +435,16 @@ func Draw() {
 	generatedMaze := maze
 	generatedSolution := solution
 	generatedSolution.Reverse()
+
+	totalSteps := generatedSolution.Length()
+	solutionSteps := 0
+
+	for _, val := range generatedSolution.Items() {
+		if val.IsPartOfSolution {
+			solutionSteps++
+		}
+	}
+
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	flag.Parse()
 
@@ -455,6 +477,10 @@ func Draw() {
 
 	state := StateGeneration
 	var generationTimeAcc int64 = 0
+	stats := Stats{
+		totalSteps,
+		solutionSteps,
+	}
 
 	guiElements := make([]GuiElement, 0)
 
@@ -495,6 +521,35 @@ func Draw() {
 		state = StateGeneration
 	}
 
+	changeAlgorithm := func() {
+		generatedSolution = generatedMaze.Solve(solverAlgorithm)
+		generatedSolution.Reverse()
+		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
+		for i := range solutionToDraw {
+			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
+		}
+
+		// RESET FN FOR THIS
+		totalSteps := generatedSolution.Length()
+		solutionSteps := 0
+
+		for _, val := range generatedSolution.Items() {
+			if val.IsPartOfSolution {
+				solutionSteps++
+			}
+		}
+
+		stats = Stats{
+			totalSteps,
+			solutionSteps,
+		}
+
+		if err != nil {
+			panic(0)
+		}
+		generationTimeAcc = 0
+	}
+
 	resetBtnText := "Reset"
 	resetBtn := &Button{
 		baseElement: baseElement{
@@ -515,7 +570,7 @@ func Draw() {
 		previousActive: solverAlgorithm,
 		text:           "DFS;BFS;GFS;AStar",
 		editMode:       &algoDropdownOpen,
-		onChange:       reset,
+		onChange:       changeAlgorithm,
 	}
 
 	levelSelectDropdownOpen := false
@@ -599,7 +654,7 @@ func Draw() {
 			colors,
 		)
 
-		drawGui(guiElements)
+		drawGui(guiElements, stats)
 		prevTime = time.Now()
 		rl.EndDrawing()
 	}
