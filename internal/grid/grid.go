@@ -196,28 +196,28 @@ func (v *Vertex) GetNeighbours() []*Vertex {
 	hasRight := v.hasConnectedVertex("right", true)
 	hasTop := v.hasConnectedVertex("top", true)
 
-	if hasTop {
+	if hasTop && !v.TopEdge.IsWall {
 		top := v.GetConnectedVertex(v.TopEdge)
 		if !top.VisitedBySolver {
 			neighbours = append(neighbours, top)
 		}
 	}
 
-	if hasRight {
+	if hasRight && !v.RightEdge.IsWall {
 		right := v.GetConnectedVertex(v.RightEdge)
 		if !right.VisitedBySolver {
 			neighbours = append(neighbours, right)
 		}
 	}
 
-	if hasBottom {
+	if hasBottom && !v.BottomEdge.IsWall {
 		bottom := v.GetConnectedVertex(v.BottomEdge)
 		if !bottom.VisitedBySolver {
 			neighbours = append(neighbours, bottom)
 		}
 	}
 
-	if hasLeft {
+	if hasLeft && !v.LeftEdge.IsWall {
 		left := v.GetConnectedVertex(v.LeftEdge)
 		if !left.VisitedBySolver {
 			neighbours = append(neighbours, left)

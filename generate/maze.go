@@ -295,14 +295,18 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 	q := *queue.New[*grid.Vertex]()
 	q.Push(startVertex, 0)
 
+	parentMap := make(map[*grid.Vertex]*grid.Vertex)
+
 	var currentVertex *grid.Vertex
 
 	count := 0
 	for !q.IsEmpty() {
-		currentVertex = q.Pop()
-		if currentVertex != nil && currentVertex.VisitedBySolver {
+		nextVertex := q.Pop()
+		if nextVertex != nil && nextVertex.VisitedBySolver {
 			continue
 		}
+
+		currentVertex = nextVertex
 		currentVertex.VisitedBySolver = true
 		steps.Push(currentVertex, count)
 
@@ -310,6 +314,7 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 			break
 		}
 
+		currentVertex.IsBacktracking = true
 		history.Push(currentVertex, count)
 		neighbours := currentVertex.GetNeighbours()
 
@@ -318,13 +323,22 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 				continue
 			}
 
+			parentMap[v] = currentVertex
 			q.Push(v, count)
 			count++
 		}
-
 	}
 
-	return steps
+	previousVertex := parentMap[currentVertex]
+
+	stepBackCount := 0
+	for previousVertex != nil {
+		previousVertex.IsBacktracking = false
+		previousVertex = parentMap[previousVertex]
+		stepBackCount++
+	}
+
+	return history
 }
 
 type SolverAlgorithm = int32
