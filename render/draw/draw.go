@@ -203,6 +203,22 @@ type Stats struct {
 	solutionSteps int
 }
 
+func generateStats(generatedSolution stack.Stack[*grid.Vertex]) Stats {
+	totalSteps := generatedSolution.Length()
+	solutionSteps := 0
+
+	for _, val := range generatedSolution.Items() {
+		if val.IsPartOfSolution {
+			solutionSteps++
+		}
+	}
+
+	return Stats{
+		totalSteps,
+		solutionSteps,
+	}
+}
+
 func drawGui(elements []GuiElement, stats Stats) {
 	padding := config.Padding
 	xPos := padding
@@ -436,15 +452,6 @@ func Draw() {
 	generatedSolution := solution
 	generatedSolution.Reverse()
 
-	totalSteps := generatedSolution.Length()
-	solutionSteps := 0
-
-	for _, val := range generatedSolution.Items() {
-		if val.IsPartOfSolution {
-			solutionSteps++
-		}
-	}
-
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	flag.Parse()
 
@@ -477,10 +484,8 @@ func Draw() {
 
 	state := StateGeneration
 	var generationTimeAcc int64 = 0
-	stats := Stats{
-		totalSteps,
-		solutionSteps,
-	}
+
+	stats := generateStats(generatedSolution)
 
 	guiElements := make([]GuiElement, 0)
 
@@ -509,6 +514,8 @@ func Draw() {
 		matrixToDraw, steps, currentSolverVertex = setup(newMaze)
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
 		generatedSolution.Reverse()
+		stats = generateStats(generatedSolution)
+
 		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
 		for i := range solutionToDraw {
 			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
@@ -517,6 +524,7 @@ func Draw() {
 		if err != nil {
 			panic(0)
 		}
+
 		generationTimeAcc = 0
 		state = StateGeneration
 	}
@@ -529,20 +537,7 @@ func Draw() {
 			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
 		}
 
-		// RESET FN FOR THIS
-		totalSteps := generatedSolution.Length()
-		solutionSteps := 0
-
-		for _, val := range generatedSolution.Items() {
-			if val.IsPartOfSolution {
-				solutionSteps++
-			}
-		}
-
-		stats = Stats{
-			totalSteps,
-			solutionSteps,
-		}
+		stats = generateStats(generatedSolution)
 
 		if err != nil {
 			panic(0)
