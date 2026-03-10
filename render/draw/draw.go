@@ -3,6 +3,7 @@ package render
 
 import (
 	"flag"
+	"fmt"
 	"image/color"
 	"strconv"
 	"time"
@@ -199,11 +200,12 @@ func (s *Dropdown) Render(xPos, yPos float32) {
 }
 
 type Stats struct {
-	totalSteps    int
-	solutionSteps int
+	runTimeMicroseconds int
+	totalSteps          int
+	solutionSteps       int
 }
 
-func generateStats(generatedSolution stack.Stack[*grid.Vertex]) Stats {
+func generateStats(generatedSolution stack.Stack[*grid.Vertex], runTimeMicroseconds int) Stats {
 	totalSteps := generatedSolution.Length()
 	solutionSteps := 0
 
@@ -214,9 +216,16 @@ func generateStats(generatedSolution stack.Stack[*grid.Vertex]) Stats {
 	}
 
 	return Stats{
+		runTimeMicroseconds,
 		totalSteps,
 		solutionSteps,
 	}
+}
+
+func formatTime(runTimeMicroseconds int) string {
+	duration := time.Duration(runTimeMicroseconds) * time.Microsecond
+	milliseconds := float64(duration) / float64(time.Millisecond)
+	return fmt.Sprintf("%02.3f", milliseconds)
 }
 
 func drawGui(elements []GuiElement, stats Stats) {
@@ -243,11 +252,13 @@ func drawGui(elements []GuiElement, stats Stats) {
 		xOffset += element.Bounds().width + padding
 	}
 
+	runTimeText := "Total run time: " + formatTime(stats.runTimeMicroseconds) + "ms"
 	totalStepsText := "Total steps: " + strconv.Itoa(stats.totalSteps)
 	solutionStepsText := "Solution steps: " + strconv.Itoa(stats.solutionSteps)
 
 	rl.DrawText(totalStepsText, 0, 25, 14, rl.Black)
-	rl.DrawText(solutionStepsText, 200, 25, 14, rl.Black)
+	rl.DrawText(solutionStepsText, 150, 25, 14, rl.Black)
+	rl.DrawText(runTimeText, 300, 25, 14, rl.Black)
 }
 
 func setup(
@@ -446,7 +457,10 @@ func Draw() {
 	if err != nil {
 		panic(err)
 	}
+
+	now := time.Now()
 	solution := maze.Solve(solverAlgorithm)
+	runTimeMicroseconds := time.Since(now).Microseconds()
 
 	generatedMaze := maze
 	generatedSolution := solution
@@ -485,7 +499,7 @@ func Draw() {
 	state := StateGeneration
 	var generationTimeAcc int64 = 0
 
-	stats := generateStats(generatedSolution)
+	stats := generateStats(generatedSolution, int(runTimeMicroseconds))
 
 	guiElements := make([]GuiElement, 0)
 
@@ -512,9 +526,11 @@ func Draw() {
 		newMaze, err := generate.Generate(selectedLevel)
 		generatedMaze = newMaze
 		matrixToDraw, steps, currentSolverVertex = setup(newMaze)
+		now = time.Now()
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
+		runTimeMicroseconds = time.Since(now).Microseconds()
 		generatedSolution.Reverse()
-		stats = generateStats(generatedSolution)
+		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
 		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
 		for i := range solutionToDraw {
@@ -530,14 +546,16 @@ func Draw() {
 	}
 
 	changeAlgorithm := func() {
+		now = time.Now()
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
+		runTimeMicroseconds = int64(time.Since(now).Microseconds())
 		generatedSolution.Reverse()
 		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
 		for i := range solutionToDraw {
 			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
 		}
 
-		stats = generateStats(generatedSolution)
+		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
 		if err != nil {
 			panic(0)

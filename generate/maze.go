@@ -4,11 +4,13 @@ package generate
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 
 	"maze/config"
 	"maze/internal/grid"
 	"maze/internal/queue"
 	"maze/internal/stack"
+	"maze/internal/utils"
 )
 
 type Maze struct {
@@ -355,6 +357,70 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 	return history
 }
 
+// Does not guarantee a solution - by design
+func (m *Maze) solveGFS() stack.Stack[*grid.Vertex] {
+	goalPositionX := 0
+	goalPositionY := 0
+
+	for x := range m.Matrix {
+		for y, v := range m.Matrix[x] {
+			if v.IsEnd {
+				goalPositionX = x
+				goalPositionY = y
+				break
+			}
+		}
+	}
+
+	steps := *stack.New[*grid.Vertex]()
+	startVertex := m.Matrix[0][0]
+	startVertex.IsPartOfSolution = true
+	currentVertex := startVertex
+
+	evaluationFn := func(vertex *grid.Vertex) float64 {
+		currentX := 0
+		currentY := 0
+
+		for x := range m.Matrix {
+			for y, v := range m.Matrix[x] {
+				if v == vertex {
+					currentX = x
+					currentY = y
+					break
+				}
+			}
+		}
+
+		return utils.GetCartesianDistance(int32(currentX), int32(currentY), int32(goalPositionX), int32(goalPositionY))
+	}
+
+	count := 0
+	for currentVertex != nil {
+		steps.Push(currentVertex, count)
+		if currentVertex.IsEnd {
+			break
+		}
+
+		neighbours := currentVertex.GetNeighbours()
+
+		if len(neighbours) == 0 {
+			fmt.Println("no more ways to go!")
+			break
+		}
+
+		sort.Slice(neighbours, func(i, j int) bool {
+			return evaluationFn(neighbours[i]) < evaluationFn(neighbours[j])
+		})
+
+		currentVertex = neighbours[0]
+		currentVertex.IsPartOfSolution = true
+		currentVertex.VisitedBySolver = true
+		count++
+	}
+
+	return steps
+}
+
 type SolverAlgorithm = int32
 
 const (
@@ -382,6 +448,10 @@ func (m *Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
 	case BFS:
 		{
 			return m.solveBFS()
+		}
+	case GFS:
+		{
+			return m.solveGFS()
 		}
 	}
 
