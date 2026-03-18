@@ -5,6 +5,7 @@ import (
 	"errors"
 	"image/color"
 	"math/rand"
+	"strconv"
 
 	"maze/config"
 
@@ -31,6 +32,13 @@ type Vertex struct {
 	RightEdge        *Edge
 	BottomEdge       *Edge
 	LeftEdge         *Edge
+	// Actual travel cost from start to this vertex
+	G float32
+	// Heuristic value to goal
+	H float32
+	// G + H
+	F      float32
+	Closed bool
 }
 
 func (v *Vertex) CanSplit() bool {
@@ -189,7 +197,7 @@ func (v *Vertex) hasConnectedVertex(dir string, shouldBePath bool) bool {
 	return connectedVertex != nil
 }
 
-func (v *Vertex) GetNeighbours() []*Vertex {
+func (v *Vertex) GetNeighbours(allowVisited bool) []*Vertex {
 	neighbours := make([]*Vertex, 0)
 	hasLeft := v.hasConnectedVertex("left", true)
 	hasBottom := v.hasConnectedVertex("bottom", true)
@@ -198,28 +206,28 @@ func (v *Vertex) GetNeighbours() []*Vertex {
 
 	if hasTop && !v.TopEdge.IsWall {
 		top := v.GetConnectedVertex(v.TopEdge)
-		if !top.VisitedBySolver {
+		if allowVisited || !top.VisitedBySolver {
 			neighbours = append(neighbours, top)
 		}
 	}
 
 	if hasRight && !v.RightEdge.IsWall {
 		right := v.GetConnectedVertex(v.RightEdge)
-		if !right.VisitedBySolver {
+		if allowVisited || !right.VisitedBySolver {
 			neighbours = append(neighbours, right)
 		}
 	}
 
 	if hasBottom && !v.BottomEdge.IsWall {
 		bottom := v.GetConnectedVertex(v.BottomEdge)
-		if !bottom.VisitedBySolver {
+		if allowVisited || !bottom.VisitedBySolver {
 			neighbours = append(neighbours, bottom)
 		}
 	}
 
 	if hasLeft && !v.LeftEdge.IsWall {
 		left := v.GetConnectedVertex(v.LeftEdge)
-		if !left.VisitedBySolver {
+		if allowVisited || !left.VisitedBySolver {
 			neighbours = append(neighbours, left)
 		}
 	}
@@ -352,7 +360,7 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight + config.Padding
 
 	cellColor := r.Colors().Wall
-	DEBUG := false
+	DEBUG := true
 
 	switch cellType {
 	case Wall:
@@ -376,9 +384,6 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	}
 
 	edgeColor := r.Colors().Wall
-	if DEBUG {
-		edgeColor = r.Colors().DebugWall
-	}
 
 	if cellType == Wall {
 		shadowColor := rl.NewColor(0, 0, 0, 90)
@@ -412,6 +417,9 @@ func (v *Vertex) DrawVertex(r Renderer) {
 
 	if cellType == Solution {
 		r.DrawTile(xPos, yPos, edgeWidth, edgeWidth, cellColor)
+		if DEBUG {
+			r.DrawText(strconv.FormatFloat(float64(v.H), 'f', 2, 64), xPos+3, yPos+3, 8, rl.Black)
+		}
 	}
 
 	if cellType == Backtracking && showBacktracking {

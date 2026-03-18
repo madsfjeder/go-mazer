@@ -3,11 +3,13 @@ package generate
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 
 	"maze/config"
 	"maze/internal/grid"
+	"maze/internal/pqueue"
 	"maze/internal/queue"
 	"maze/internal/stack"
 	"maze/internal/utils"
@@ -112,7 +114,7 @@ func (m *Maze) setupEmpty() {
 
 func (m *Maze) generateEmptyTest() {
 	steps := stack.New[*grid.Vertex]()
-	currentVertex := m.Matrix[0][0]
+	currentVertex := m.Matrix[10][5]
 	currentVertex.IsStart = true
 
 	idx := 0
@@ -141,7 +143,7 @@ func (m *Maze) generateEmptyTest() {
 		}
 	}
 
-	lastVertex := m.Matrix[config.VerticesPerRow-1][config.VerticesPerCol-1]
+	lastVertex := m.Matrix[config.VerticesPerRow-10][config.VerticesPerCol-5]
 	lastVertex.IsEnd = true
 	m.Steps = *steps
 }
@@ -238,6 +240,7 @@ func (m *Maze) resetSolution() {
 	for i := range m.Matrix {
 		for j := range m.Matrix[i] {
 			vertex := m.Matrix[i][j]
+			vertex.Closed = false
 			vertex.VisitedBySolver = false
 			vertex.IsBacktracking = false
 			vertex.IsPartOfSolution = false
@@ -248,7 +251,17 @@ func (m *Maze) resetSolution() {
 func (m *Maze) solveDFS() stack.Stack[*grid.Vertex] {
 	steps := *stack.New[*grid.Vertex]()
 
-	currentVertex := m.Matrix[0][0]
+	var currentVertex *grid.Vertex
+
+	for i := range m.Matrix {
+		for _, v := range m.Matrix[i] {
+			if v.IsStart {
+				currentVertex = v
+				break
+			}
+		}
+	}
+
 	currentVertex.VisitedBySolver = true
 	previousVertex := currentVertex
 	previousVertex.IsPartOfSolution = true
@@ -302,7 +315,18 @@ func (m *Maze) solveDFS() stack.Stack[*grid.Vertex] {
 
 func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 	steps := *stack.New[*grid.Vertex]()
-	startVertex := m.Matrix[0][0]
+
+	var startVertex *grid.Vertex
+
+	for i := range m.Matrix {
+		for _, v := range m.Matrix[i] {
+			if v.IsStart {
+				startVertex = v
+				break
+			}
+		}
+	}
+
 	startVertex.IsPartOfSolution = true
 
 	history := *stack.New[*grid.Vertex]()
@@ -330,7 +354,7 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 		}
 
 		currentVertex.IsBacktracking = true
-		neighbours := currentVertex.GetNeighbours()
+		neighbours := currentVertex.GetNeighbours(false)
 
 		for _, v := range neighbours {
 			if v.VisitedBySolver {
@@ -373,7 +397,18 @@ func (m *Maze) solveGFS() stack.Stack[*grid.Vertex] {
 	}
 
 	steps := *stack.New[*grid.Vertex]()
-	startVertex := m.Matrix[0][0]
+
+	var startVertex *grid.Vertex
+
+	for i := range m.Matrix {
+		for _, v := range m.Matrix[i] {
+			if v.IsStart {
+				startVertex = v
+				break
+			}
+		}
+	}
+
 	startVertex.IsPartOfSolution = true
 	currentVertex := startVertex
 
@@ -401,7 +436,7 @@ func (m *Maze) solveGFS() stack.Stack[*grid.Vertex] {
 			break
 		}
 
-		neighbours := currentVertex.GetNeighbours()
+		neighbours := currentVertex.GetNeighbours(false)
 
 		if len(neighbours) == 0 {
 			fmt.Println("no more ways to go!")
@@ -416,6 +451,126 @@ func (m *Maze) solveGFS() stack.Stack[*grid.Vertex] {
 		currentVertex.IsPartOfSolution = true
 		currentVertex.VisitedBySolver = true
 		count++
+	}
+
+	return steps
+}
+
+func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
+	steps := *stack.New[*grid.Vertex]()
+	parentMap := make(map[*grid.Vertex]*grid.Vertex)
+	goalPositionX := 0
+	goalPositionY := 0
+
+	for x := range m.Matrix {
+		for y, v := range m.Matrix[x] {
+			if v.IsEnd {
+				goalPositionX = x
+				goalPositionY = y
+				break
+			}
+		}
+	}
+
+	evaluationFn := func(vertex *grid.Vertex) float64 {
+		currentX := 0
+		currentY := 0
+
+		for x := range m.Matrix {
+			for y, v := range m.Matrix[x] {
+				if v == vertex {
+					currentX = x
+					currentY = y
+					break
+				}
+			}
+		}
+
+		return math.Abs(float64(goalPositionX-currentX)) + math.Abs(float64(goalPositionY-currentY))
+	}
+
+	open := pqueue.New[*grid.Vertex]()
+	gMap := make(map[*grid.Vertex]float32)
+
+	var startVertex *grid.Vertex
+
+	for i := range m.Matrix {
+		for _, v := range m.Matrix[i] {
+			if v.IsStart {
+				startVertex = v
+				break
+			}
+		}
+	}
+
+	startVertex.IsPartOfSolution = true
+	startVertex.VisitedBySolver = true
+	startVertex.G = 0
+	startVertex.H = float32(evaluationFn(startVertex))
+	startVertex.F = startVertex.G + startVertex.H
+	currentVertex := startVertex
+	open.Insert(startVertex, startVertex.F)
+
+	count := 0
+	for open.Length() > 0 {
+		currentVertex = open.Pop()
+		if currentVertex.Closed {
+			continue
+		}
+
+		steps.Push(currentVertex, count)
+
+		goalFound := false
+		neighbours := currentVertex.GetNeighbours(false)
+
+		for _, neighbour := range neighbours {
+			if neighbour.IsEnd {
+				goalFound = true
+
+				break
+			}
+
+			if neighbour.Closed {
+				continue
+			}
+
+			tentativeG := currentVertex.G + 1
+			currentG, ok := gMap[neighbour]
+
+			if ok && currentG <= tentativeG {
+				continue
+			}
+
+			gMap[neighbour] = tentativeG
+			neighbour.G = tentativeG
+			neighbour.H = float32(evaluationFn(neighbour))
+			neighbour.F = neighbour.G + neighbour.H
+
+			open.Insert(neighbour, neighbour.F)
+			parentMap[neighbour] = currentVertex
+		}
+
+		currentVertex.Closed = true
+		currentVertex.VisitedBySolver = true
+		currentVertex.IsBacktracking = true
+		count++
+
+		if goalFound {
+			break
+		}
+	}
+
+	fmt.Println("Total count:", count)
+
+	previousVertex := parentMap[currentVertex]
+	currentVertex.IsPartOfSolution = true
+
+	stepBackCount := 0
+	for previousVertex != nil {
+		previousVertex.IsBacktracking = false
+		previousVertex.IsPartOfSolution = true
+		previousVertex = parentMap[previousVertex]
+		stepBackCount++
 	}
 
 	return steps
@@ -452,6 +607,10 @@ func (m *Maze) Solve(algo SolverAlgorithm) stack.Stack[*grid.Vertex] {
 	case GFS:
 		{
 			return m.solveGFS()
+		}
+	case AStar:
+		{
+			return m.solveAStar()
 		}
 	}
 
