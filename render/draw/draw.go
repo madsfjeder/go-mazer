@@ -267,11 +267,7 @@ func setup(
 	reversedSteps := maze.Steps.Copy()
 	reversedSteps.Reverse()
 
-	matrixToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
-
-	for i := range matrixToDraw {
-		matrixToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
-	}
+	matrixToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerRow))
 
 	var elementToDraw *grid.Vertex
 
@@ -366,8 +362,8 @@ func drawWalls(
 func drawSolver(
 	solvingPlaying bool,
 	completedMaze generate.Maze,
-	matrixToDraw [][]*grid.Vertex,
-	solution *stack.Stack[*grid.Vertex],
+	solutionsToDraw *DrawnSolutions,
+	solutions Solutions,
 	colors grid.Colors,
 	interval int64,
 	prevTime time.Time,
@@ -377,6 +373,13 @@ func drawSolver(
 	// Corresponds to the "CPU" exploring the maze. ie the current position
 	var newestElement *grid.Vertex
 	drawEveryLoop := make([]*grid.Vertex, 0)
+	solution := solutions.pathWithBacktracking
+	matrixToDraw := *solutionsToDraw.pathWithBacktracking
+
+	if !showBacktracking {
+		solution = solutions.path
+		matrixToDraw = *solutionsToDraw.path
+	}
 
 	if solvingPlaying {
 		if interval > 0 {
@@ -449,6 +452,47 @@ const (
 	StateDone
 )
 
+type Solutions struct {
+	path                 *stack.Stack[*grid.Vertex]
+	pathWithBacktracking *stack.Stack[*grid.Vertex]
+}
+
+func (s *Solutions) set(solution stack.Stack[*grid.Vertex]) {
+	cpy := solution.Copy()
+	cpy.Filter(func(e *grid.Vertex) bool {
+		if e == nil {
+			return false
+		}
+		return !e.IsBacktracking
+	})
+
+	s.path = &cpy
+	s.pathWithBacktracking = &solution
+}
+
+type DrawnSolutions struct {
+	path                 *[][]*grid.Vertex
+	pathWithBacktracking *[][]*grid.Vertex
+}
+
+func (d *DrawnSolutions) reset() {
+	solutionToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
+	solutionToDrawWithBacktracking := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
+
+	d.path = &solutionToDraw
+	d.pathWithBacktracking = &solutionToDrawWithBacktracking
+}
+
+func newDrawnSolutions() *DrawnSolutions {
+	solutionToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
+	solutionToDrawWithBacktracking := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
+
+	return &DrawnSolutions{
+		path:                 &solutionToDraw,
+		pathWithBacktracking: &solutionToDrawWithBacktracking,
+	}
+}
+
 func Draw() {
 	solverAlgorithm := generate.DFS
 	selectedLevel := generate.RandomMaze
@@ -465,6 +509,19 @@ func Draw() {
 	generatedMaze := maze
 	generatedSolution := solution
 	generatedSolution.Reverse()
+
+	cpy := solution.Copy()
+	cpy.Filter(func(e *grid.Vertex) bool {
+		if e == nil {
+			return false
+		}
+		return !e.IsBacktracking
+	})
+
+	solutions := Solutions{
+		path:                 &cpy,
+		pathWithBacktracking: &solution,
+	}
 
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	flag.Parse()
@@ -491,11 +548,8 @@ func Draw() {
 	var solveDrawInterval int64 = 15
 
 	matrixToDraw, steps, currentSolverVertex := setup(maze)
-	solutionToDraw := make([][]*grid.Vertex, config.VerticesPerRow)
-	for i := range solutionToDraw {
-		solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
-	}
 
+	solutionsToDraw := newDrawnSolutions()
 	state := StateGeneration
 	var generationTimeAcc int64 = 0
 
@@ -525,17 +579,17 @@ func Draw() {
 	reset := func() {
 		newMaze, err := generate.Generate(selectedLevel)
 		generatedMaze = newMaze
+
 		matrixToDraw, steps, currentSolverVertex = setup(newMaze)
+
 		now = time.Now()
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
-		runTimeMicroseconds = time.Since(now).Microseconds()
 		generatedSolution.Reverse()
+		solutions.set(generatedSolution)
+		runTimeMicroseconds = time.Since(now).Microseconds()
 		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
-		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
-		for i := range solutionToDraw {
-			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
-		}
+		solutionsToDraw.reset()
 
 		if err != nil {
 			panic(0)
@@ -550,10 +604,8 @@ func Draw() {
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
 		runTimeMicroseconds = int64(time.Since(now).Microseconds())
 		generatedSolution.Reverse()
-		solutionToDraw = make([][]*grid.Vertex, config.VerticesPerRow)
-		for i := range solutionToDraw {
-			solutionToDraw[i] = make([]*grid.Vertex, config.VerticesPerCol)
-		}
+		solutions.set(generatedSolution)
+		solutionsToDraw.reset()
 
 		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
@@ -652,8 +704,8 @@ func Draw() {
 			drawSolver(
 				solvingPlaying,
 				generatedMaze,
-				solutionToDraw,
-				&generatedSolution,
+				solutionsToDraw,
+				solutions,
 				colors,
 				solveDrawInterval,
 				prevTime,

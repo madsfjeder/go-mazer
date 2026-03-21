@@ -41,6 +41,15 @@ type Vertex struct {
 	Closed bool
 }
 
+func New(width, height int) [][]*Vertex {
+	g := make([][]*Vertex, config.VerticesPerRow)
+	for i := range g {
+		g[i] = make([]*Vertex, config.VerticesPerCol)
+	}
+
+	return g
+}
+
 func (v *Vertex) CanSplit() bool {
 	var upVertex *Vertex
 	var rightVertex *Vertex
@@ -360,7 +369,7 @@ func (v *Vertex) DrawVertex(r Renderer) {
 	yPos := (r.Config().Y * edgeWidth) + config.MenuBarHeight + config.Padding
 
 	cellColor := r.Colors().Wall
-	DEBUG := true
+	DEBUG := false
 
 	switch cellType {
 	case Wall:

@@ -339,6 +339,7 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 
 	count := 0
 	for !q.IsEmpty() {
+		count++
 		nextVertex := q.Pop()
 		if nextVertex != nil && nextVertex.VisitedBySolver {
 			continue
@@ -363,7 +364,6 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 
 			parentMap[v] = currentVertex
 			q.Push(v, count)
-			count++
 		}
 	}
 
@@ -458,6 +458,8 @@ func (m *Maze) solveGFS() stack.Stack[*grid.Vertex] {
 
 func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
 	steps := *stack.New[*grid.Vertex]()
+	open := pqueue.New[*grid.Vertex]()
+	gMap := make(map[*grid.Vertex]float32)
 	parentMap := make(map[*grid.Vertex]*grid.Vertex)
 	goalPositionX := 0
 	goalPositionY := 0
@@ -489,9 +491,6 @@ func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
 		return math.Abs(float64(goalPositionX-currentX)) + math.Abs(float64(goalPositionY-currentY))
 	}
 
-	open := pqueue.New[*grid.Vertex]()
-	gMap := make(map[*grid.Vertex]float32)
-
 	var startVertex *grid.Vertex
 
 	for i := range m.Matrix {
@@ -514,22 +513,16 @@ func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
 	count := 0
 	for open.Length() > 0 {
 		currentVertex = open.Pop()
+
 		if currentVertex.Closed {
 			continue
 		}
 
 		steps.Push(currentVertex, count)
 
-		goalFound := false
 		neighbours := currentVertex.GetNeighbours(false)
 
 		for _, neighbour := range neighbours {
-			if neighbour.IsEnd {
-				goalFound = true
-
-				break
-			}
-
 			if neighbour.Closed {
 				continue
 			}
@@ -539,6 +532,11 @@ func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
 
 			if ok && currentG <= tentativeG {
 				continue
+			}
+
+			parentMap[neighbour] = currentVertex
+			if neighbour.IsEnd {
+				tentativeG = 0
 			}
 
 			gMap[neighbour] = tentativeG
@@ -555,7 +553,8 @@ func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
 		currentVertex.IsBacktracking = true
 		count++
 
-		if goalFound {
+		if currentVertex.IsEnd {
+			currentVertex.IsBacktracking = false
 			break
 		}
 	}

@@ -64,13 +64,26 @@ func (s Stack[T]) Print() {
 	}
 }
 
-func (s Stack[T]) Copy() Stack[T] {
+func (s *Stack[T]) Copy() Stack[T] {
 	itemsSlice := make([]StackItem[T], len(s.items))
 	copy(itemsSlice, s.items)
 
 	return Stack[T]{
 		items: itemsSlice,
 	}
+}
+
+// Filter in place
+func (s *Stack[T]) Filter(fn func(e T) bool) {
+	filteredItems := make([]StackItem[T], len(s.items))
+	for _, v := range s.items {
+		shouldAppend := fn(v.item)
+		if shouldAppend {
+			filteredItems = append(filteredItems, v)
+		}
+	}
+
+	s.items = filteredItems
 }
 
 func (s *Stack[T]) Reverse() {
