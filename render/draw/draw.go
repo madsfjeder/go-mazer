@@ -376,11 +376,6 @@ func drawSolver(
 	solution := solutions.pathWithBacktracking
 	matrixToDraw := *solutionsToDraw.pathWithBacktracking
 
-	if !showBacktracking {
-		solution = solutions.path
-		matrixToDraw = *solutionsToDraw.path
-	}
-
 	if solvingPlaying {
 		if interval > 0 {
 			delta := time.Since(prevTime)
@@ -427,11 +422,9 @@ func drawSolver(
 			if e != nil {
 				cellType := grid.Solution
 				if e.IsBacktracking {
-					if !showBacktracking {
-						continue
-					}
 					cellType = grid.Backtracking
 				}
+
 				r := NewRaylibRenderer(i, j, cellType, colors, showBacktracking)
 				e.DrawVertex(r)
 			}
@@ -453,42 +446,27 @@ const (
 )
 
 type Solutions struct {
-	path                 *stack.Stack[*grid.Vertex]
 	pathWithBacktracking *stack.Stack[*grid.Vertex]
 }
 
 func (s *Solutions) set(solution stack.Stack[*grid.Vertex]) {
-	cpy := solution.Copy()
-	cpy.Filter(func(e *grid.Vertex) bool {
-		if e == nil {
-			return false
-		}
-		return !e.IsBacktracking
-	})
-
-	s.path = &cpy
 	s.pathWithBacktracking = &solution
 }
 
 type DrawnSolutions struct {
-	path                 *[][]*grid.Vertex
 	pathWithBacktracking *[][]*grid.Vertex
 }
 
 func (d *DrawnSolutions) reset() {
-	solutionToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
 	solutionToDrawWithBacktracking := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
 
-	d.path = &solutionToDraw
 	d.pathWithBacktracking = &solutionToDrawWithBacktracking
 }
 
 func newDrawnSolutions() *DrawnSolutions {
-	solutionToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
 	solutionToDrawWithBacktracking := grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol))
 
 	return &DrawnSolutions{
-		path:                 &solutionToDraw,
 		pathWithBacktracking: &solutionToDrawWithBacktracking,
 	}
 }
@@ -510,16 +488,7 @@ func Draw() {
 	generatedSolution := solution
 	generatedSolution.Reverse()
 
-	cpy := solution.Copy()
-	cpy.Filter(func(e *grid.Vertex) bool {
-		if e == nil {
-			return false
-		}
-		return !e.IsBacktracking
-	})
-
 	solutions := Solutions{
-		path:                 &cpy,
 		pathWithBacktracking: &solution,
 	}
 
