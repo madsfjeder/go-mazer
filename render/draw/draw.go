@@ -289,85 +289,22 @@ func drawGui(elements []GuiElement, stats Stats) {
 
 func setup(
 	maze generate.Maze,
-) ([][]*grid.Vertex, stack.Stack[*grid.Vertex], *grid.Vertex) {
+) ([][]*grid.Vertex, stack.Stack[*grid.Vertex]) {
 	reversedSteps := maze.Steps.Copy()
 	reversedSteps.Reverse()
 
 	matrixToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerRow))
 
-	var elementToDraw *grid.Vertex
-
-	return matrixToDraw, reversedSteps, elementToDraw
+	return matrixToDraw, reversedSteps
 }
 
 func drawGeneration(
-	completedMaze generate.Maze,
-	matrixToDraw [][]*grid.Vertex,
-	steps *stack.Stack[*grid.Vertex],
-	currentSolverVertex *grid.Vertex,
-	colors grid.Colors,
-	interval int64,
-	timeAcc *int64,
-	prevTime time.Time,
+	animationData GeneratorAnimationData,
+	animationConfig AnimationConfig,
 	onComplete func(),
 ) {
-	drawEveryLoop := make([]*grid.Vertex, 0)
-
-	if interval > 0 {
-		delta := time.Since(prevTime)
-		*timeAcc += delta.Milliseconds()
-
-		for *timeAcc >= interval {
-			*timeAcc -= interval
-			e, _ := steps.Pop()
-			drawEveryLoop = append(drawEveryLoop, e)
-		}
-	} else {
-		drawEveryLoop = steps.PopAll()
-	}
-
-	for i := range completedMaze.Matrix {
-		for j := range completedMaze.Matrix[i] {
-			v := completedMaze.Matrix[i][j]
-			for _, toDraw := range drawEveryLoop {
-				if v == toDraw {
-					matrixToDraw[i][j] = toDraw
-				}
-			}
-		}
-	}
-
-	for i := range matrixToDraw {
-		for j := range matrixToDraw[i] {
-			e := matrixToDraw[i][j]
-
-			if e != nil {
-				if e == currentSolverVertex {
-					continue
-				}
-
-				cellType := grid.Path
-
-				if e.IsSplit {
-					cellType = grid.Split
-				}
-
-				r := NewRaylibRenderer(i, j, cellType, colors, false)
-				e.DrawVertex(r)
-			} else {
-				r := NewRaylibRenderer(i, j, grid.EmptyCell, colors, false)
-				empty := grid.Vertex{
-					IsPath:          false,
-					VisitedBySolver: false,
-				}
-				empty.DrawVertex(r)
-			}
-		}
-	}
-
-	if steps.Length() == 0 {
-		onComplete()
-	}
+	animationData.Draw(animationConfig)
+	onComplete()
 }
 
 func drawWalls(
@@ -385,16 +322,49 @@ func drawWalls(
 	}
 }
 
-type AnimationData struct {
-	path             stack.Stack[*grid.Vertex]
-	fullStackOfItems []stack.StackItem[*grid.Vertex]
-	itemsToRender    []stack.StackItem[*grid.Vertex]
-	matrixToRender   [][]*grid.Vertex
-	completedMatrix  generate.Maze
-	currentElement   *grid.Vertex
+type animationData struct {
+	itemsToRender   []stack.StackItem[*grid.Vertex]
+	completedMatrix generate.Maze
+	matrixToRender  [][]*grid.Vertex
 }
 
-func (a *AnimationData) Filter(idx int) {
+type GeneratorAnimationData struct {
+	animationData
+}
+
+func (g *GeneratorAnimationData) Draw(animationConfig AnimationConfig) {
+	for i := range g.completedMatrix.Matrix {
+		for j := range g.completedMatrix.Matrix[i] {
+			e := g.completedMatrix.Matrix[i][j]
+
+			if e != nil {
+				cellType := grid.Path
+
+				if e.IsSplit {
+					cellType = grid.Split
+				}
+
+				r := NewRaylibRenderer(i, j, cellType, animationConfig.colors, false)
+				e.DrawVertex(r)
+			}
+		}
+	}
+}
+
+type CurrentElement struct {
+	element *grid.Vertex
+	x       int
+	y       int
+}
+
+type SolverAnimationData struct {
+	animationData
+	path             stack.Stack[*grid.Vertex]
+	fullStackOfItems []stack.StackItem[*grid.Vertex]
+	currentElement   CurrentElement
+}
+
+func (a *SolverAnimationData) Filter(idx int) {
 	filteredItems := make([]stack.StackItem[*grid.Vertex], 0, len(a.itemsToRender))
 	for _, v := range a.fullStackOfItems {
 		shouldAppend := v.Item != nil && v.Index <= idx
@@ -406,16 +376,7 @@ func (a *AnimationData) Filter(idx int) {
 	a.itemsToRender = filteredItems
 }
 
-func (a *AnimationData) UpdateNewestElement() {
-	if len(a.itemsToRender) > 0 {
-		a.currentElement = a.itemsToRender[len(a.itemsToRender)-1].Item
-	}
-}
-
-func (a *AnimationData) Refresh() (int, int) {
-	newestElementX := 0
-	newestElementY := 0
-
+func (a *SolverAnimationData) Refresh() {
 	for i := range a.completedMatrix.Matrix {
 		for j := range a.completedMatrix.Matrix[i] {
 			v := a.completedMatrix.Matrix[i][j]
@@ -425,33 +386,22 @@ func (a *AnimationData) Refresh() (int, int) {
 				}
 			}
 
-			if a.currentElement != nil && v == a.currentElement {
-				newestElementX = i
-				newestElementY = j
+			if a.currentElement.element != nil && v == a.currentElement.element {
+				a.currentElement.x = i
+				a.currentElement.y = j
 			}
 		}
 	}
 
-	return newestElementX, newestElementY
+	if len(a.itemsToRender) > 0 {
+		a.currentElement.element = a.itemsToRender[len(a.itemsToRender)-1].Item
+	}
 }
 
-type AnimationConfig struct {
-	colors           grid.Colors
-	showBacktracking *bool
-}
-
-func drawSolver(
-	animationTiming *AnimationTiming,
-	animationData *AnimationData,
-	animationConfig AnimationConfig,
-) {
-	animationTiming.Increment()
-	animationData.Filter(animationTiming.idxCount)
-	x, y := animationData.Refresh()
-
-	for i := range animationData.matrixToRender {
-		for j := range animationData.matrixToRender[i] {
-			e := animationData.matrixToRender[i][j]
+func (a *SolverAnimationData) Draw(animationConfig AnimationConfig) {
+	for i := range a.matrixToRender {
+		for j := range a.matrixToRender[i] {
+			e := a.matrixToRender[i][j]
 
 			if e != nil {
 				cellType := grid.Solution
@@ -465,10 +415,26 @@ func drawSolver(
 		}
 	}
 
-	if animationData.currentElement != nil {
-		r := NewRaylibRenderer(x, y, grid.CPU, animationConfig.colors, *animationConfig.showBacktracking)
-		animationData.currentElement.DrawVertex(r)
+	if a.currentElement.element != nil {
+		r := NewRaylibRenderer(a.currentElement.x, a.currentElement.y, grid.CPU, animationConfig.colors, *animationConfig.showBacktracking)
+		a.currentElement.element.DrawVertex(r)
 	}
+}
+
+type AnimationConfig struct {
+	colors           grid.Colors
+	showBacktracking *bool
+}
+
+func drawSolver(
+	animationTiming *AnimationTiming,
+	animationData *SolverAnimationData,
+	animationConfig AnimationConfig,
+) {
+	animationTiming.Increment()
+	animationData.Filter(animationTiming.idxCount)
+	animationData.Refresh()
+	animationData.Draw(animationConfig)
 }
 
 type State int
@@ -478,14 +444,6 @@ const (
 	StateSolving
 	StateDone
 )
-
-type Solutions struct {
-	pathWithBacktracking *stack.Stack[*grid.Vertex]
-}
-
-func (s *Solutions) set(solution stack.Stack[*grid.Vertex]) {
-	s.pathWithBacktracking = &solution
-}
 
 func Draw() {
 	solverAlgorithm := generate.DFS
@@ -503,11 +461,6 @@ func Draw() {
 
 	generatedMaze := maze
 	generatedSolution := solution
-	// generatedSolution.Reverse()
-
-	solutions := Solutions{
-		pathWithBacktracking: &solution,
-	}
 
 	itemsToRender := make([]stack.StackItem[*grid.Vertex], 0)
 	s := solution.PopAllWithIdx()
@@ -534,7 +487,6 @@ func Draw() {
 		DebugWall:    rl.Beige,
 	}
 
-	var generateDrawInterval int64 = 0
 	var solveDrawInterval int64 = 15
 
 	animationTiming := AnimationTiming{
@@ -545,14 +497,28 @@ func Draw() {
 		running:  solvingPlaying,
 	}
 
-	matrixToDraw, steps, currentSolverVertex := setup(maze)
+	matrixToDraw, steps := setup(maze)
 
-	animationData := AnimationData{
-		path:             *solutions.pathWithBacktracking,
-		completedMatrix:  maze,
+	stepsToRender := make([]stack.StackItem[*grid.Vertex], 0)
+	newS := steps.PopAllWithIdx()
+	stepsToRender = append(stepsToRender, newS...)
+
+	generatorAnimationData := GeneratorAnimationData{
+		animationData: animationData{
+			matrixToRender:  matrixToDraw,
+			completedMatrix: maze,
+			itemsToRender:   stepsToRender,
+		},
+	}
+
+	solverAnimationData := SolverAnimationData{
+		animationData: animationData{
+			itemsToRender:   itemsToRender,
+			matrixToRender:  grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol)),
+			completedMatrix: maze,
+		},
+		path:             solution,
 		fullStackOfItems: itemsToRender,
-		itemsToRender:    itemsToRender,
-		matrixToRender:   grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol)),
 	}
 
 	showBacktracking := true
@@ -563,8 +529,6 @@ func Draw() {
 	}
 
 	state := StateGeneration
-	var generationTimeAcc int64 = 0
-
 	stats := generateStats(generatedSolution, int(runTimeMicroseconds))
 
 	guiElements := make([]GuiElement, 0)
@@ -591,12 +555,11 @@ func Draw() {
 		newMaze, err := generate.Generate(selectedLevel)
 		generatedMaze = newMaze
 
-		matrixToDraw, steps, currentSolverVertex = setup(newMaze)
+		matrixToDraw, steps = setup(newMaze)
 
 		now = time.Now()
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
 		generatedSolution.Reverse()
-		solutions.set(generatedSolution)
 		runTimeMicroseconds = time.Since(now).Microseconds()
 		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
@@ -608,11 +571,10 @@ func Draw() {
 			panic(0)
 		}
 
-		animationData.itemsToRender = make([]stack.StackItem[*grid.Vertex], 0)
-		animationData.path = generatedSolution
-		animationData.completedMatrix = generatedMaze
+		solverAnimationData.itemsToRender = make([]stack.StackItem[*grid.Vertex], 0)
+		solverAnimationData.path = generatedSolution
+		solverAnimationData.completedMatrix = generatedMaze
 
-		generationTimeAcc = 0
 		state = StateGeneration
 	}
 
@@ -621,7 +583,6 @@ func Draw() {
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
 		runTimeMicroseconds = int64(time.Since(now).Microseconds())
 		generatedSolution.Reverse()
-		solutions.set(generatedSolution)
 
 		itemsToRender = make([]stack.StackItem[*grid.Vertex], 0)
 		s := generatedSolution.PopAllWithIdx()
@@ -632,7 +593,6 @@ func Draw() {
 		if err != nil {
 			panic(0)
 		}
-		generationTimeAcc = 0
 	}
 
 	resetBtnText := "Reset"
@@ -692,8 +652,6 @@ func Draw() {
 
 	guiElements = append(guiElements, playBtn, resetBtn, levelSelectDropdown, algoDropdown, slider, toggle)
 
-	prevTime := time.Now()
-
 	rl.InitWindow(config.Width, config.Height, "Mazen")
 	defer rl.CloseWindow()
 
@@ -703,18 +661,11 @@ func Draw() {
 		rl.BeginDrawing()
 
 		drawGeneration(
-			generatedMaze,
-			matrixToDraw,
-			&steps,
-			currentSolverVertex,
-			colors,
-			generateDrawInterval,
-			&generationTimeAcc,
-			prevTime,
+			generatorAnimationData,
+			animationConfig,
 			func() {
 				if state == StateGeneration {
 					state = StateSolving
-					generationTimeAcc = 0
 				}
 			},
 		)
@@ -722,13 +673,13 @@ func Draw() {
 		if state == StateSolving {
 			drawSolver(
 				&animationTiming,
-				&animationData,
+				&solverAnimationData,
 				animationConfig,
 			)
 		}
 
 		drawWalls(
-			matrixToDraw,
+			maze.Matrix,
 			colors,
 		)
 

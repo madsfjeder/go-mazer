@@ -388,7 +388,6 @@ func (v *Vertex) DrawVertex(r Renderer) {
 		cellColor = r.Colors().EmptyCell
 
 	case Split:
-		// Change to highlight splits
 		cellColor = r.Colors().Cell
 	}
 
