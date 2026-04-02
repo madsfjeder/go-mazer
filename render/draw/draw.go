@@ -369,31 +369,36 @@ func drawSolver(
 	prevTime time.Time,
 	timeAcc *int64,
 	showBacktracking bool,
+	idxCount *int,
+	drawEveryLoop []stack.StackItem[*grid.Vertex],
 ) {
 	// Corresponds to the "CPU" exploring the maze. ie the current position
 	var newestElement *grid.Vertex
-	drawEveryLoop := make([]*grid.Vertex, 0)
-	solution := solutions.pathWithBacktracking
 	matrixToDraw := *solutionsToDraw.pathWithBacktracking
 
 	if solvingPlaying {
-		if interval > 0 {
+		if interval > 0 && *idxCount < 100_000 {
 			delta := time.Since(prevTime)
 			*timeAcc += delta.Milliseconds()
 
 			for *timeAcc >= interval {
 				*timeAcc -= interval
-				e, _ := solution.Pop()
-				drawEveryLoop = append(drawEveryLoop, e)
+				*idxCount++
 			}
-		} else {
-			s := solution.PopAll()
-			drawEveryLoop = append(drawEveryLoop, s...)
 		}
 	}
 
+	filteredItems := make([]stack.StackItem[*grid.Vertex], 0, len(drawEveryLoop))
+	for _, v := range drawEveryLoop {
+		shouldAppend := v.Item != nil && v.Index <= *idxCount
+		if shouldAppend {
+			filteredItems = append(filteredItems, v)
+		}
+	}
+
+	drawEveryLoop = filteredItems
 	if len(drawEveryLoop) > 0 {
-		newestElement = drawEveryLoop[len(drawEveryLoop)-1]
+		newestElement = drawEveryLoop[len(drawEveryLoop)-1].Item
 	}
 
 	newestElementX := 0
@@ -403,8 +408,8 @@ func drawSolver(
 		for j := range completedMaze.Matrix[i] {
 			v := completedMaze.Matrix[i][j]
 			for _, toDraw := range drawEveryLoop {
-				if v == toDraw {
-					matrixToDraw[i][j] = toDraw
+				if v == toDraw.Item {
+					matrixToDraw[i][j] = toDraw.Item
 				}
 			}
 
@@ -486,11 +491,15 @@ func Draw() {
 
 	generatedMaze := maze
 	generatedSolution := solution
-	generatedSolution.Reverse()
+	// generatedSolution.Reverse()
 
 	solutions := Solutions{
 		pathWithBacktracking: &solution,
 	}
+
+	drawEveryLoop := make([]stack.StackItem[*grid.Vertex], 0)
+	s := solution.PopAllWithIdx()
+	drawEveryLoop = append(drawEveryLoop, s...)
 
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	flag.Parse()
@@ -517,6 +526,7 @@ func Draw() {
 	var solveDrawInterval int64 = 15
 
 	matrixToDraw, steps, currentSolverVertex := setup(maze)
+	idxCount := 0
 
 	solutionsToDraw := newDrawnSolutions()
 	state := StateGeneration
@@ -558,6 +568,11 @@ func Draw() {
 		runTimeMicroseconds = time.Since(now).Microseconds()
 		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
+		drawEveryLoop = make([]stack.StackItem[*grid.Vertex], 0)
+		s := generatedSolution.PopAllWithIdx()
+		drawEveryLoop = append(drawEveryLoop, s...)
+
+		idxCount = 0
 		solutionsToDraw.reset()
 
 		if err != nil {
@@ -575,6 +590,11 @@ func Draw() {
 		generatedSolution.Reverse()
 		solutions.set(generatedSolution)
 		solutionsToDraw.reset()
+		idxCount = 0
+
+		drawEveryLoop = make([]stack.StackItem[*grid.Vertex], 0)
+		s := generatedSolution.PopAllWithIdx()
+		drawEveryLoop = append(drawEveryLoop, s...)
 
 		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
 
@@ -644,6 +664,7 @@ func Draw() {
 	guiElements = append(guiElements, playBtn, resetBtn, levelSelectDropdown, algoDropdown, slider, toggle)
 
 	prevTime := time.Now()
+
 	rl.InitWindow(config.Width, config.Height, "Mazen")
 	defer rl.CloseWindow()
 
@@ -680,6 +701,8 @@ func Draw() {
 				prevTime,
 				&generationTimeAcc,
 				showBacktracking,
+				&idxCount,
+				drawEveryLoop,
 			)
 		}
 

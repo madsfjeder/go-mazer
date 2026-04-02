@@ -8,8 +8,8 @@ import (
 )
 
 type StackItem[T comparable] struct {
-	item  T
-	index int
+	Item  T
+	Index int
 }
 
 type Stack[T comparable] struct {
@@ -43,14 +43,29 @@ func (s *Stack[T]) Pop() (T, error) {
 	s.items[lastIndex] = zero
 	s.items = s.items[:lastIndex]
 
-	return element.item, nil
+	return element.Item, nil
 }
 
 func (s *Stack[T]) PopAll() []T {
 	list := make([]T, 0)
 
 	for _, v := range s.items {
-		list = append(list, v.item)
+		list = append(list, v.Item)
+	}
+
+	s.items = make([]StackItem[T], 0)
+
+	return list
+}
+
+func (s *Stack[T]) PopAllWithIdx() []StackItem[T] {
+	list := make([]StackItem[T], 0)
+
+	for _, v := range s.items {
+		list = append(list, StackItem[T]{
+			Item:  v.Item,
+			Index: v.Index,
+		})
 	}
 
 	s.items = make([]StackItem[T], 0)
@@ -77,7 +92,7 @@ func (s *Stack[T]) Copy() Stack[T] {
 func (s *Stack[T]) Filter(fn func(e T) bool) {
 	filteredItems := make([]StackItem[T], len(s.items))
 	for _, v := range s.items {
-		shouldAppend := fn(v.item)
+		shouldAppend := fn(v.Item)
 		if shouldAppend {
 			filteredItems = append(filteredItems, v)
 		}
@@ -92,7 +107,7 @@ func (s *Stack[T]) Reverse() {
 
 func (s *Stack[T]) FindOrder(v T) int {
 	for i, e := range s.items {
-		if v == e.item {
+		if v == e.Item {
 			return i
 		}
 	}
@@ -108,7 +123,7 @@ func (s *Stack[T]) Items() []T {
 	items := make([]T, 0)
 
 	for _, v := range s.items {
-		items = append(items, v.item)
+		items = append(items, v.Item)
 	}
 
 	return items

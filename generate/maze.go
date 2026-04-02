@@ -314,8 +314,6 @@ func (m *Maze) solveDFS() stack.Stack[*grid.Vertex] {
 }
 
 func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
-	steps := *stack.New[*grid.Vertex]()
-
 	var startVertex *grid.Vertex
 
 	for i := range m.Matrix {
@@ -340,15 +338,14 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 	count := 0
 	for !q.IsEmpty() {
 		count++
-		nextVertex := q.Pop()
+		nextVertex, idx := q.Pop()
 		if nextVertex != nil && nextVertex.VisitedBySolver {
 			continue
 		}
 
 		currentVertex = nextVertex
 		currentVertex.VisitedBySolver = true
-		steps.Push(currentVertex, count)
-		history.Push(currentVertex, count)
+		history.Push(currentVertex, idx)
 
 		if currentVertex.IsEnd {
 			break
@@ -363,7 +360,7 @@ func (m *Maze) solveBFS() stack.Stack[*grid.Vertex] {
 			}
 
 			parentMap[v] = currentVertex
-			q.Push(v, count)
+			q.Push(v, idx+1)
 		}
 	}
 
