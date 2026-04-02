@@ -402,7 +402,6 @@ func (v *Vertex) DrawVertex(r Renderer) {
 
 		if v.RightEdge != nil && (v.RightEdge.IsWall || !v.GetConnectedVertex(v.RightEdge).IsPath) {
 			r.DrawRectangle(xPos+edgeWidth-(wallWidth/2), yPos, wallWidth-config.Padding, edgeWidth, edgeColor)
-
 			r.DrawRectangle(xPos+edgeWidth+1, yPos+1, 2, edgeWidth, shadowColor)
 		}
 
@@ -415,6 +414,7 @@ func (v *Vertex) DrawVertex(r Renderer) {
 			r.DrawRectangle(xPos-(wallWidth/2), yPos, wallWidth-config.Padding, edgeWidth, edgeColor)
 			r.DrawRectangle(xPos+1, yPos+1, 2, edgeWidth, shadowColor)
 		}
+
 		return
 	}
 

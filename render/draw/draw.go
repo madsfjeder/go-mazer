@@ -330,15 +330,13 @@ type GeneratorAnimationData struct {
 func getGeneratorAnimationData(
 	maze generate.Maze,
 ) GeneratorAnimationData {
-	steps := maze.Steps.Copy()
-
 	matrixToDraw := grid.New(int(config.VerticesPerRow), int(config.VerticesPerRow))
 
 	return GeneratorAnimationData{
 		animationData: animationData{
 			matrixToRender:  matrixToDraw,
 			completedMatrix: maze,
-			itemsToRender:   steps.PopAllWithIdx(),
+			itemsToRender:   maze.Steps.PopAllWithIdx(),
 		},
 	}
 }
@@ -348,7 +346,7 @@ func (g *GeneratorAnimationData) Draw(animationConfig AnimationConfig) {
 		for j := range g.completedMatrix.Matrix[i] {
 			e := g.completedMatrix.Matrix[i][j]
 
-			if e != nil {
+			if e != nil && e.IsPath {
 				cellType := grid.Path
 
 				if e.IsSplit {
@@ -357,6 +355,13 @@ func (g *GeneratorAnimationData) Draw(animationConfig AnimationConfig) {
 
 				r := NewRaylibRenderer(i, j, cellType, animationConfig.colors, false)
 				e.DrawVertex(r)
+			} else {
+				r := NewRaylibRenderer(i, j, grid.EmptyCell, animationConfig.colors, false)
+				empty := grid.Vertex{
+					IsPath:          false,
+					VisitedBySolver: false,
+				}
+				empty.DrawVertex(r)
 			}
 		}
 	}
@@ -506,9 +511,6 @@ func Draw() {
 	solution := maze.Solve(solverAlgorithm)
 	runTimeMicroseconds := time.Since(now).Microseconds()
 
-	generatedMaze := maze
-	generatedSolution := solution
-
 	debugPtr := flag.Bool("debug", false, "turns debugging on")
 	flag.Parse()
 
@@ -555,7 +557,7 @@ func Draw() {
 	}
 
 	state := StateGeneration
-	stats := generateStats(generatedSolution, int(runTimeMicroseconds))
+	stats := generateStats(solution, int(runTimeMicroseconds))
 
 	guiElements := make([]GuiElement, 0)
 
@@ -578,22 +580,20 @@ func Draw() {
 	}
 
 	reset := func(shouldRegenerateMaze bool) {
-		generatedMaze = maze
 		if shouldRegenerateMaze {
-			generatedMaze, err = generate.Generate(selectedLevel)
-			maze = generatedMaze
+			maze, err = generate.Generate(selectedLevel)
 		}
 
-		generatorAnimationData = getGeneratorAnimationData(generatedMaze)
+		generatorAnimationData = getGeneratorAnimationData(maze)
 
 		now = time.Now()
-		generatedSolution = generatedMaze.Solve(solverAlgorithm)
+		solution = maze.Solve(solverAlgorithm)
 		runTimeMicroseconds = time.Since(now).Microseconds()
-		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
+		stats = generateStats(solution, int(runTimeMicroseconds))
 
 		solverAnimationData = getSolverAnimationData(
-			generatedSolution,
-			generatedMaze,
+			solution,
+			maze,
 		)
 
 		animationTiming.Reset()
