@@ -380,20 +380,34 @@ func getSolverAnimationData(
 	maze generate.Maze,
 ) *SolverAnimationData {
 	solverItems := solution.PopAllWithIdx()
-	var element *grid.Vertex
+	var zero *grid.Vertex
+	startItem := CurrentElement{
+		element: zero,
+		x:       0,
+		y:       0,
+	}
+
+	for i := range maze.Matrix {
+		for j := range maze.Matrix[i] {
+			e := maze.Matrix[i][j]
+			if e.IsStart {
+				startItem.element = e
+				startItem.x = i
+				startItem.y = j
+				break
+			}
+		}
+	}
+
 	return &SolverAnimationData{
 		animationData: animationData{
-			itemsToRender:   solverItems,
+			itemsToRender:   make([]stack.StackItem[*grid.Vertex], 0),
 			matrixToRender:  grid.New(int(config.VerticesPerRow), int(config.VerticesPerCol)),
 			completedMatrix: maze,
 		},
 		path:             solution,
 		fullStackOfItems: solverItems,
-		currentElement: CurrentElement{
-			element: element,
-			x:       0,
-			y:       0,
-		},
+		currentElement:   startItem,
 	}
 }
 
@@ -555,24 +569,27 @@ func Draw() {
 		onClick: func() {
 			if solvingPlaying {
 				playBtnText = "Play"
-				solvingPlaying = false
+				animationTiming.running = false
 			} else {
 				playBtnText = "Pause"
-				solvingPlaying = true
+				animationTiming.running = true
 			}
 		},
 	}
 
-	reset := func() {
-		generatedMaze, err := generate.Generate(selectedLevel)
+	reset := func(shouldRegenerateMaze bool) {
+		generatedMaze = maze
+		if shouldRegenerateMaze {
+			generatedMaze, err = generate.Generate(selectedLevel)
+			maze = generatedMaze
+		}
+
+		generatorAnimationData = getGeneratorAnimationData(generatedMaze)
 
 		now = time.Now()
 		generatedSolution = generatedMaze.Solve(solverAlgorithm)
-		generatedSolution.Reverse()
 		runTimeMicroseconds = time.Since(now).Microseconds()
 		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
-
-		generatorAnimationData = getGeneratorAnimationData(generatedMaze)
 
 		solverAnimationData = getSolverAnimationData(
 			generatedSolution,
@@ -588,36 +605,16 @@ func Draw() {
 		state = StateGeneration
 	}
 
-	changeAlgorithm := func() {
-		now = time.Now()
-		generatedSolution = generatedMaze.Solve(solverAlgorithm)
-		runTimeMicroseconds = int64(time.Since(now).Microseconds())
-		generatedSolution.Reverse()
-
-		generatorAnimationData = getGeneratorAnimationData(generatedMaze)
-
-		solverAnimationData = getSolverAnimationData(
-			generatedSolution,
-			generatedMaze,
-		)
-
-		animationTiming.Reset()
-
-		stats = generateStats(generatedSolution, int(runTimeMicroseconds))
-
-		if err != nil {
-			panic(0)
-		}
-	}
-
 	resetBtnText := "Reset"
 	resetBtn := &Button{
 		baseElement: baseElement{
 			width:  100,
 			height: 20,
 		},
-		text:    &resetBtnText,
-		onClick: reset,
+		text: &resetBtnText,
+		onClick: func() {
+			reset(true)
+		},
 	}
 
 	algoDropdownOpen := false
@@ -630,7 +627,9 @@ func Draw() {
 		previousActive: solverAlgorithm,
 		text:           "DFS;BFS;GFS;AStar",
 		editMode:       &algoDropdownOpen,
-		onChange:       changeAlgorithm,
+		onChange: func() {
+			reset(false)
+		},
 	}
 
 	levelSelectDropdownOpen := false
@@ -643,7 +642,9 @@ func Draw() {
 		previousActive: selectedLevel,
 		text:           "Random maze;Empty test",
 		editMode:       &levelSelectDropdownOpen,
-		onChange:       reset,
+		onChange: func() {
+			reset(true)
+		},
 	}
 
 	slider := &Slider{

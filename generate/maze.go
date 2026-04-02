@@ -244,6 +244,9 @@ func (m *Maze) resetSolution() {
 			vertex.VisitedBySolver = false
 			vertex.IsBacktracking = false
 			vertex.IsPartOfSolution = false
+			vertex.G = 0
+			vertex.F = 0
+			vertex.H = 0
 		}
 	}
 }
