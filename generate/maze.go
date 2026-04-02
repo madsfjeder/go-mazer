@@ -556,8 +556,6 @@ func (m *Maze) solveAStar() stack.Stack[*grid.Vertex] {
 		}
 	}
 
-	fmt.Println("Total count:", count)
-
 	previousVertex := parentMap[currentVertex]
 	currentVertex.IsPartOfSolution = true
 
