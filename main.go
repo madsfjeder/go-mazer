@@ -2,7 +2,7 @@
 package main
 
 import (
-	render "maze/render/draw"
+	render "maze/draw"
 )
 
 func main() {
