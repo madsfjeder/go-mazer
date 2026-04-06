@@ -3,6 +3,7 @@ package draw
 
 import (
 	"flag"
+	"image/color"
 	"strconv"
 	"time"
 
@@ -23,7 +24,13 @@ const (
 	StateDone
 )
 
+var (
+	backgroundColor color.RGBA = rl.NewColor(98, 123, 183, 100)
+	borderColor     color.RGBA = rl.NewColor(47, 62, 99, 100)
+)
+
 func drawGui(elements []GuiElement, stats Stats) {
+	buttonsContainerHeight := int32(25)
 	padding := config.Padding
 	xPos := padding
 	yPos := padding
@@ -33,7 +40,29 @@ func drawGui(elements []GuiElement, stats Stats) {
 		yPos,
 		config.MenuBarWidth,
 		config.MenuBarHeight-padding,
-		rl.White,
+		backgroundColor,
+	)
+
+	rl.DrawRectangleLinesEx(
+		rl.NewRectangle(
+			0,
+			0,
+			float32(config.Width),
+			float32(buttonsContainerHeight+(padding*2)),
+		),
+		3,
+		borderColor,
+	)
+
+	rl.DrawRectangleLinesEx(
+		rl.NewRectangle(
+			0,
+			float32(buttonsContainerHeight),
+			float32(config.Width),
+			35,
+		),
+		3,
+		borderColor,
 	)
 
 	xOffset := xPos + padding
@@ -51,9 +80,11 @@ func drawGui(elements []GuiElement, stats Stats) {
 	totalStepsText := "Total steps: " + strconv.Itoa(stats.totalSteps)
 	solutionStepsText := "Solution steps: " + strconv.Itoa(stats.solutionSteps)
 
-	rl.DrawText(totalStepsText, 0, 25, 14, rl.Black)
-	rl.DrawText(solutionStepsText, 150, 25, 14, rl.Black)
-	rl.DrawText(runTimeText, 300, 25, 14, rl.Black)
+	statsOffset := buttonsContainerHeight + padding + 5
+
+	rl.DrawText(totalStepsText, 0, statsOffset, 14, rl.Black)
+	rl.DrawText(solutionStepsText, 150, statsOffset, 14, rl.Black)
+	rl.DrawText(runTimeText, 300, statsOffset, 14, rl.Black)
 }
 
 func drawGeneration(
@@ -69,7 +100,7 @@ func drawWalls(
 	animationData GeneratorAnimationData,
 	animationConfig AnimationConfig,
 ) {
-	animationData.Draw(animationConfig)
+	animationData.DrawWalls(animationConfig)
 }
 
 func drawSolver(
@@ -109,7 +140,7 @@ func Draw() {
 	colors := grid.Colors{
 		Start:        rl.DarkPurple,
 		End:          rl.Green,
-		Wall:         rl.NewColor(30, 30, 30, 255),
+		Wall:         rl.NewColor(30, 40, 64, 255),
 		Backtracking: rl.Gray,
 		Split:        rl.Magenta,
 		EmptyCell:    rl.Brown,
@@ -231,17 +262,7 @@ func Draw() {
 		},
 	}
 
-	slider := &Slider{
-		baseElement: baseElement{
-			width:  150,
-			height: 20,
-		},
-		value:     float32(solveDrawInterval),
-		textLeft:  "Slower",
-		textRight: "Faster",
-	}
-
-	toggle := &Toggle{
+	backtrackingToggle := &Toggle{
 		baseElement: baseElement{
 			width:  100,
 			height: 20,
@@ -250,13 +271,13 @@ func Draw() {
 		active: &showBacktracking,
 	}
 
-	guiElements = append(guiElements, playBtn, resetBtn, levelSelectDropdown, algoDropdown, slider, toggle)
+	guiElements = append(guiElements, playBtn, resetBtn, levelSelectDropdown, algoDropdown, backtrackingToggle)
 
 	rl.InitWindow(config.Width, config.Height, "Mazen")
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(60)
-	rl.DrawRectangle(0, 0, config.Width, config.Height, rl.Black)
+	rl.DrawRectangle(0, 0, config.Width, config.Height, borderColor)
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 
