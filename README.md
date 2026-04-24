@@ -1,6 +1,9 @@
 # go-mazer - a maze generator + solver written entirely in Go
 
-It's just a simple learning project written to learn Go, and brush up on searching algorithms. 
+<img width="800" height="800" alt="maze1" src="https://github.com/user-attachments/assets/1e028e90-0443-4759-9dfe-9a6489a1c00a" />
+
+
+A simple learning project written to learn Go, and brush up on searching algorithms. 
 All graphics drawn using [raylib-go](https://github.com/gen2brain/raylib-go)
 
 Execution is simple: Run `go run main.go` and you'll immediately see a maze being randomly generated and solved. 
