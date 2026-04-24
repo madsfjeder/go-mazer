@@ -21,4 +21,6 @@ Available levels:
 More splits = more complex maze
 - An empty test level. This is great for seeing how the different algos behave on a visual level (also where BFS really shows its ineffeciency, and GFS shines)
 
+<img width="800" height="800" alt="maze3" src="https://github.com/user-attachments/assets/6af49050-852f-459a-8a8b-7e9cdc9669ed" />
+
 Feel free to contribute!
