@@ -4,7 +4,6 @@ package draw
 import (
 	"flag"
 	"image/color"
-	"strconv"
 	"time"
 
 	"maze/config"
@@ -25,67 +24,11 @@ const (
 )
 
 var (
-	backgroundColor color.RGBA = rl.NewColor(98, 123, 183, 100)
-	borderColor     color.RGBA = rl.NewColor(47, 62, 99, 100)
+	backgroundColor color.RGBA = rl.NewColor(230, 230, 230, 100)
+	borderColor     color.RGBA = rl.NewColor(180, 180, 180, 100)
 )
 
-func drawGui(elements []GuiElement, stats Stats) {
-	buttonsContainerHeight := int32(25)
-	padding := config.Padding
-	xPos := padding
-	yPos := padding
-
-	rl.DrawRectangle(
-		xPos,
-		yPos,
-		config.MenuBarWidth,
-		config.MenuBarHeight-padding,
-		backgroundColor,
-	)
-
-	rl.DrawRectangleLinesEx(
-		rl.NewRectangle(
-			0,
-			0,
-			float32(config.Width),
-			float32(buttonsContainerHeight+(padding*2)),
-		),
-		3,
-		borderColor,
-	)
-
-	rl.DrawRectangleLinesEx(
-		rl.NewRectangle(
-			0,
-			float32(buttonsContainerHeight),
-			float32(config.Width),
-			35,
-		),
-		3,
-		borderColor,
-	)
-
-	xOffset := xPos + padding
-	yOffset := yPos + padding
-
-	for _, element := range elements {
-		element.Render(
-			float32(xOffset),
-			float32(yOffset),
-		)
-		xOffset += element.Bounds().width + padding
-	}
-
-	runTimeText := "Total run time: " + formatTime(stats.runTimeMicroseconds) + "ms"
-	totalStepsText := "Total steps: " + strconv.Itoa(stats.totalSteps)
-	solutionStepsText := "Solution steps: " + strconv.Itoa(stats.solutionSteps)
-
-	statsOffset := buttonsContainerHeight + padding + 5
-
-	rl.DrawText(totalStepsText, 0, statsOffset, 14, rl.Black)
-	rl.DrawText(solutionStepsText, 150, statsOffset, 14, rl.Black)
-	rl.DrawText(runTimeText, 300, statsOffset, 14, rl.Black)
-}
+var font rl.Font
 
 func drawGeneration(
 	animationData GeneratorAnimationData,
@@ -276,10 +219,17 @@ func Draw() {
 	rl.InitWindow(config.Width, config.Height, "Mazen")
 	defer rl.CloseWindow()
 
+	font = rl.LoadFontEx("./assets/Minecraft.ttf", 14, nil)
+
+	if !rl.IsFontValid(font) {
+		panic("font not valid")
+	}
+
 	rl.SetTargetFPS(60)
 	rl.DrawRectangle(0, 0, config.Width, config.Height, borderColor)
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
+		rl.DrawRectangle(0, 0, config.Width, config.Height, borderColor)
 
 		drawGeneration(
 			generatorAnimationData,
@@ -304,7 +254,7 @@ func Draw() {
 			animationConfig,
 		)
 
-		drawGui(guiElements, stats)
+		DrawGui(guiElements, stats)
 
 		animationTiming.prevTime = time.Now()
 

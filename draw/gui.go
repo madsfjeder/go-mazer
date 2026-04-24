@@ -1,6 +1,10 @@
 package draw
 
 import (
+	"strconv"
+
+	"maze/config"
+
 	gui "github.com/gen2brain/raylib-go/raygui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
@@ -125,4 +129,108 @@ func (s *Dropdown) Render(xPos, yPos float32) {
 		s.previousActive = *s.active
 		s.onChange()
 	}
+}
+
+func DrawGui(elements []GuiElement, stats Stats) {
+	textColor := rl.NewColor(0, 0, 56, 150)
+	buttonsContainerHeight := int32(25)
+	padding := config.Padding
+	xPos := padding
+	yPos := padding
+
+	rl.DrawRectangle(
+		xPos,
+		yPos,
+		config.MenuBarWidth,
+		config.MenuBarHeight-padding,
+		backgroundColor,
+	)
+
+	rl.DrawRectangleLinesEx(
+		rl.NewRectangle(
+			0,
+			0,
+			float32(config.Width),
+			float32(buttonsContainerHeight+(padding*2)),
+		),
+		2,
+		borderColor,
+	)
+
+	rl.DrawRectangleLinesEx(
+		rl.NewRectangle(
+			0,
+			float32(buttonsContainerHeight+padding),
+			float32(config.Width),
+			float32(buttonsContainerHeight),
+		),
+		2,
+		borderColor,
+	)
+
+	xOffset := xPos + padding
+	yOffset := yPos + padding
+
+	for _, element := range elements {
+		element.Render(
+			float32(xOffset),
+			float32(yOffset),
+		)
+		xOffset += element.Bounds().width + padding
+	}
+
+	runTimeText := "Total run time: " + formatTime(stats.runTimeMicroseconds) + "ms"
+	totalStepsText := "Total steps: " + strconv.Itoa(stats.totalSteps)
+	solutionStepsText := "Solution steps: " + strconv.Itoa(stats.solutionSteps)
+
+	statsOffset := buttonsContainerHeight + padding
+	statTextOffset := statsOffset + 8
+
+	rl.DrawTextEx(
+		font,
+		totalStepsText,
+		rl.Vector2{
+			X: float32(padding + 5),
+			Y: float32(statTextOffset),
+		}, 14, 1, textColor)
+
+	rl.DrawRectangle(
+		padding+140,
+		statsOffset,
+		2,
+		buttonsContainerHeight,
+		borderColor,
+	)
+
+	rl.DrawTextEx(
+		font,
+		solutionStepsText,
+		rl.Vector2{
+			X: 150,
+			Y: float32(statTextOffset),
+		}, 14, 1, textColor)
+
+	rl.DrawRectangle(
+		300,
+		statsOffset,
+		2,
+		buttonsContainerHeight,
+		borderColor,
+	)
+
+	rl.DrawTextEx(
+		font,
+		runTimeText,
+		rl.Vector2{
+			X: 308,
+			Y: float32(statTextOffset),
+		}, 14, 1, textColor)
+
+	rl.DrawRectangle(
+		500,
+		statsOffset,
+		2,
+		buttonsContainerHeight,
+		borderColor,
+	)
 }

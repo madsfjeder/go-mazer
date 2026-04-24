@@ -5,8 +5,8 @@ const (
 	EdgeWidth     int32 = 20
 	WallWidth     int32 = EdgeWidth / 4
 	Width         int32 = 800 + WallWidth
-	Height        int32 = 800 - WallWidth
-	MenuBarHeight int32 = 60
+	Height        int32 = 800 - WallWidth*3
+	MenuBarHeight int32 = 50
 	MenuBarWidth  int32 = Width - WallWidth
 	Padding       int32 = 2
 )
