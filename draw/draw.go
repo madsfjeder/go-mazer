@@ -153,7 +153,7 @@ func Draw() {
 		},
 		text: &playBtnText,
 		onClick: func() {
-			if solvingPlaying {
+			if animationTiming.running {
 				playBtnText = "Play"
 				animationTiming.running = false
 			} else {

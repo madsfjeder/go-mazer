@@ -132,7 +132,7 @@ func (s *Dropdown) Render(xPos, yPos float32) {
 }
 
 func DrawGui(elements []GuiElement, stats Stats) {
-	textColor := rl.NewColor(0, 0, 56, 150)
+	textColor := rl.NewColor(0, 0, 56, 125)
 	buttonsContainerHeight := int32(25)
 	padding := config.Padding
 	xPos := padding
@@ -167,17 +167,6 @@ func DrawGui(elements []GuiElement, stats Stats) {
 		2,
 		borderColor,
 	)
-
-	xOffset := xPos + padding
-	yOffset := yPos + padding
-
-	for _, element := range elements {
-		element.Render(
-			float32(xOffset),
-			float32(yOffset),
-		)
-		xOffset += element.Bounds().width + padding
-	}
 
 	runTimeText := "Total run time: " + formatTime(stats.runTimeMicroseconds) + "ms"
 	totalStepsText := "Total steps: " + strconv.Itoa(stats.totalSteps)
@@ -233,4 +222,15 @@ func DrawGui(elements []GuiElement, stats Stats) {
 		buttonsContainerHeight,
 		borderColor,
 	)
+
+	xOffset := xPos + padding
+	yOffset := yPos + padding
+
+	for _, element := range elements {
+		element.Render(
+			float32(xOffset),
+			float32(yOffset),
+		)
+		xOffset += element.Bounds().width + padding
+	}
 }
